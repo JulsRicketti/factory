@@ -48,15 +48,34 @@ Add the autopilot loop (watch + auto-fix on every review comment / CI change):
 ~/Workspace/factory/scripts/factory HUB-12345 --watch
 ```
 
-Put the factory on your `PATH` so you can just type `factory HUB-12345` from anywhere:
+### Attach to an existing PR
+
+Someone reviewed an older PR — attach a watch loop to it (auto-fix on every blocker change):
+
+```bash
+factory-watch https://github.com/qlik-trial/hub-parcels/pull/4521
+factory-watch qlik-trial/hub-parcels#4521
+factory-watch qlik-trial/hub-parcels 4521
+
+# From inside the repo's checkout — infers the owner/repo from `gh`:
+cd ~/Workspace/hub-parcels && factory-watch 4521
+
+# Watch only, don't auto-fix (just print state changes):
+factory-watch 4521 --no-auto-fix
+```
+
+### Put it on your `PATH`
+
+So you can type `factory` / `factory-watch` from anywhere:
 
 ```bash
 echo 'export PATH="$HOME/Workspace/factory/scripts:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 factory HUB-12345
+factory-watch 4521
 ```
 
-Environment overrides:
+### Environment overrides
 
 - `FACTORY_MODEL=claude-opus-4.7` — pin a specific model
 - `FACTORY_DRY_RUN=1` — print the `copilot` command without running
@@ -98,35 +117,45 @@ Read [.github/prompts/autopilot.prompt.md](.github/prompts/autopilot.prompt.md) 
 
 ## Commands
 
-| Task                               | Command                                                                |
-| ---------------------------------- | ---------------------------------------------------------------------- |
-| Create a worktree for a task       | `./scripts/new-worktree.sh <repo> <TICKET>-<summary>`                  |
-| Watch a PR (blocker fingerprint)   | `./scripts/watch-pr.sh <owner>/<repo> <pr-number>`                     |
-| Watch + auto-trigger fix on change | `./scripts/watch-pr.sh <owner>/<repo> <pr-number> --on-change '<cmd>'` |
-| Dump PR feedback for the agent     | `./scripts/fetch-pr-feedback.sh <owner>/<repo> <pr-number>`            |
-| Create a branch (no worktree)      | `./scripts/new-branch.sh <repo> <branch>`                              |
-| List repos under `~/Workspace/`    | `./scripts/list-repos.sh`                                              |
+Top-level entry points (use these day-to-day):
+
+| Task | Command |
+| --- | --- |
+| Ticket → draft PR (autopilot, no questions) | `factory <TICKET>` |
+| Same, then watch + auto-fix until merged | `factory <TICKET> --watch` |
+| Same, but don't auto-fix — just watch | `factory <TICKET> --watch --no-auto-fix` |
+| Attach watch+auto-fix to an existing PR | `factory-watch <pr-url \| owner/repo#num \| num>` |
+| Watch existing PR, no auto-fix | `factory-watch <pr> --no-auto-fix` |
+| Print the `copilot` command without running | `FACTORY_DRY_RUN=1 factory <TICKET>` |
+
+Low-level helpers (the entry points above compose these):
+
+| Task | Command |
+| --- | --- |
+| Create a worktree for a task | `./scripts/new-worktree.sh <repo> <TICKET>-<summary>` |
+| Raw watch loop (custom on-change hook) | `./scripts/watch-pr.sh <owner>/<repo> <pr-number> [--on-change '<cmd>']` |
+| Dump raw PR feedback for inspection | `./scripts/fetch-pr-feedback.sh <owner>/<repo> <pr-number>` |
+| Create a branch (no worktree) | `./scripts/new-branch.sh <repo> <branch>` |
+| List repos under `~/Workspace/` | `./scripts/list-repos.sh` |
 
 ### End-to-end autonomous loop
 
 ```bash
-# 1. Kick off: ticket → draft PR
-copilot --add-dir ~/Workspace --allow-all-tools \
-  -p "Follow AGENTS.md. Take HUB-12345 and produce a draft PR."
+# Terminal A — ticket to draft PR to merged, all in one
+factory HUB-12345 --watch
 
-# 2. Let the watch loop auto-dispatch fixes on every blocker change
-./scripts/watch-pr.sh qlik-trial/hub-parcels 4521 --on-change \
-  'copilot --add-dir ~/Workspace --allow-all-tools \
-     -p "Follow AGENTS.md stage 9. Respond to review on hub-parcels#4521 and learn from it."'
+# Terminal B — separately, babysit an older PR that's getting reviewed now
+factory-watch qlik-trial/hub-parcels#4500
 ```
 
 ## Prompts
 
-- [starter](.github/prompts/starter.prompt.md) — the full 9-stage loop entry point
+- [autopilot](.github/prompts/autopilot.prompt.md) — **used by `factory <TICKET>`**; zero questions, zero approvals
+- [starter](.github/prompts/starter.prompt.md) — interactive 9-stage loop (shows plan, waits for approval)
 - [triage-jira](.github/prompts/triage-jira.prompt.md) — read-only scoping + plan
 - [take-jira-ticket](.github/prompts/take-jira-ticket.prompt.md) — implement to draft PR
 - [open-pr](.github/prompts/open-pr.prompt.md) — PR-only step for a pushed branch
-- [respond-to-pr-review](.github/prompts/respond-to-pr-review.prompt.md) — address comments, push, reply
+- [respond-to-pr-review](.github/prompts/respond-to-pr-review.prompt.md) — **used by `factory-watch`**; address comments, push, reply
 - [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) — distill lessons into memory
 
 ## Learning — the config IS the memory
