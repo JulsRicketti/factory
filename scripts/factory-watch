@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# factory-watch — watch an existing PR and auto-dispatch fixes on every blocker change.
+#
+# Usage:
+#   factory-watch <pr>                    # watch + auto-fix (default)
+#   factory-watch <pr> --no-auto-fix      # watch only, just print state changes
+#
+# <pr> accepts any of:
+#   https://github.com/qlik-trial/hub-parcels/pull/4521
+#   qlik-trial/hub-parcels#4521
+#   qlik-trial/hub-parcels 4521
+#   4521                                  # inferred via `gh pr view` in cwd
+#
+# Env:
+#   FACTORY_WATCH_INTERVAL=30   — seconds between polls
+set -euo pipefail
+
+FACTORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ $# -lt 1 ]]; then
+  echo "usage: factory-watch <pr-url | owner/repo#num | owner/repo num | num> [--no-auto-fix]" >&2
+  exit 2
+fi
+
+AUTO_FIX=1
+ARGS=()
+for a in "$@"; do
+  case "$a" in
+    --no-auto-fix) AUTO_FIX=0 ;;
+    *) ARGS+=("$a") ;;
+  esac
+done
+set -- "${ARGS[@]}"
+
+REPO=""; PR=""
+case "$1" in
+  https://github.com/*/pull/*)
+    path="${1#https://github.com/}"
+    REPO="${path%/pull/*}"
+    PR="${path##*/pull/}"; PR="${PR%%[/?#]*}"
+    ;;
+  */*#*)
+    REPO="${1%#*}"; PR="${1#*#}" ;;
+  */*)
+    REPO="$1"; PR="${2:-}" ;;
+  *)
+    # bare number — infer repo from current git remote
+    PR="$1"
+    REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
+    ;;
+esac
+
+if [[ -z "$REPO" || -z "$PR" ]]; then
+  echo "could not parse PR reference: $*" >&2
+  exit 2
+fi
+
+command -v copilot >/dev/null || { echo "copilot CLI required" >&2; exit 1; }
+command -v gh      >/dev/null || { echo "gh CLI required"      >&2; exit 1; }
+command -v jq      >/dev/null || { echo "jq required"          >&2; exit 1; }
+
+echo "▶ factory-watch: $REPO#$PR  (auto-fix: $([[ $AUTO_FIX == 1 ]] && echo on || echo off))"
+
+if [[ "$AUTO_FIX" == "1" ]]; then
+  FIX_PROMPT="Follow AGENTS.md stage 9. Respond to all review feedback on $REPO#$PR, push fixes, reply per thread, then run learn-from-pr. Do not ask questions. End with FACTORY_RESULT."
+  exec "$FACTORY_ROOT/scripts/watch-pr.sh" "$REPO" "$PR" --on-change \
+    "cd '$FACTORY_ROOT' && copilot --add-dir '$HOME/Workspace' --allow-all-tools --no-color -p \"$FIX_PROMPT\""
+else
+  exec "$FACTORY_ROOT/scripts/watch-pr.sh" "$REPO" "$PR"
+fi

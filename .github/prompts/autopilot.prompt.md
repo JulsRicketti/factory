@@ -71,6 +71,7 @@ Derive from the ticket summary + acceptance criteria. Don't paraphrase — be sp
 ## If truly stuck
 
 Print exactly one line starting with `FACTORY_BLOCKED:` followed by a one-sentence reason, then exit non-zero. Examples:
+
 - `FACTORY_BLOCKED: ticket HUB-99999 not found`
 - `FACTORY_BLOCKED: no repo under ~/Workspace/ matches components [platform,billing]`
 - `FACTORY_BLOCKED: lint fails on generated file I cannot modify`
