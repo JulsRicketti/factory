@@ -1,53 +1,130 @@
 # factory
 
-A lightweight control repo that connects Copilot / agents to **Jira** and **GitHub** MCPs and drives a repeatable workflow:
+A lightweight control repo that connects Copilot (CLI + VS Code) to **Jira** and **GitHub** MCPs and drives a repeatable 9-stage loop:
 
-> **Jira ticket → local implementation in the target repo → commit → PR → watch.**
+> **INGEST → UNDERSTAND → PLAN → PREPARE → IMPLEMENT → VERIFY → SUBMIT → WATCH → FIX/LEARN**
+
+This is your **autonomous development loop**. See [AGENTS.md](AGENTS.md) for the full agent contract.
 
 This repo does **not** contain product code. It contains:
 
-- MCP server configuration (`.vscode/mcp.json`)
-- Copilot instructions (`.github/copilot-instructions.md`, [AGENTS.md](AGENTS.md))
-- Reusable prompts (`.github/prompts/`)
-- A dedicated chat mode (`.github/chatmodes/factory.chatmode.md`)
-- Helper scripts (`scripts/`)
+- MCP server configuration for VS Code (`.vscode/mcp.json`) and Copilot CLI (`.mcp.json`)
+- The agent contract ([AGENTS.md](AGENTS.md)) and Copilot instructions (`.github/copilot-instructions.md`)
+- Reusable prompts (`.github/prompts/`) — starter, triage, PR open, review response, learning
+- A VS Code chat mode (`.github/chatmodes/Factory.chatmode.md`)
+- Helper scripts (`scripts/`) — worktree, watch loop with blocker fingerprint, PR feedback dump
+- Learned lessons seed (`.factory/lessons.md`)
 
 ## Target repos
 
-Sibling folders under `~/Workspace/` — e.g. `hub-parcels`, `hub`, `hub-common`, `mc-parcels`, etc. The factory agent operates on whichever repo a Jira ticket points to.
+Sibling folders under `~/Workspace/` — e.g. `hub-parcels`, `hub`, `hub-common`, `mc-parcels`. The agent operates on whichever repo a Jira ticket points to, always via a **git worktree** so your main checkout stays clean.
 
-## Quick start
+## Pre-flight checklist
 
-1. Open this folder in VS Code.
-2. Accept the MCP server startup prompts (Jira + GitHub).
-3. Open the **Factory** chat mode and say something like:
+Verify each of these before running the factory for the first time.
 
-   > Take `HUB-12345` and implement it.
+| Tool | Install | Verify |
+|---|---|---|
+| GitHub CLI | `brew install gh && gh auth login` | `gh auth status` |
+| Copilot CLI | `npm install -g @github/copilot` | `copilot --version` |
+| `jq` (used by watch loop) | `brew install jq` | `jq --version` |
+| GitHub token for scripts | [Create PAT](https://github.com/settings/tokens) (scopes: `repo`, `read:org`) | `echo $GITHUB_TOKEN` |
+| MCP servers in VS Code | Accept the startup prompt from `.vscode/mcp.json` | Chat 🔧 → see `mcp_github_*`, `mcp_jira_*` |
+| MCP servers in Copilot CLI | Already declared in `.mcp.json` at repo root | `copilot mcp list` |
 
-4. The agent will:
-   - Read the Jira ticket (`mcp_jira_get_issue`)
-   - Pick the right local repo under `~/Workspace/`
-   - Create a branch, implement, run tests/lint
-   - Commit and open a PR (via GitHub MCP or `gh`)
-   - Link the PR back on the Jira ticket
-   - Transition the ticket to _In Review_
+> ⚠️ **VS Code MCP config does NOT carry over to the CLI.** They're different files (`.vscode/mcp.json` vs `.mcp.json` / `~/.copilot/mcp-config.json`). Both are already set up here.
+
+## Quick start — VS Code
+
+1. `code ~/Workspace/factory`
+2. Accept the MCP startup prompts (GitHub + Atlassian).
+3. Open Chat, pick the **Factory** mode, say:
+   > Take HUB-12345 and implement it.
+
+## Quick start — Copilot CLI
+
+```bash
+cd ~/Workspace/factory
+copilot mcp list                                           # confirm github + atlassian
+copilot --add-dir ~/Workspace -p @.github/prompts/starter.prompt.md
+```
+
+Or inline (non-interactive):
+```bash
+copilot --add-dir ~/Workspace --allow-all-tools \
+  -p "Follow AGENTS.md. Take HUB-12345 and produce a draft PR."
+```
+
+## The 9 stages
+
+| # | Stage | Owner | What happens |
+|---|---|---|---|
+| 1 | INGEST | agent | Fetch Jira ticket + all comments (raw, unfiltered) |
+| 2 | UNDERSTAND | agent | Read target repo's AGENTS.md, workflows, sample files |
+| 3 | PLAN | agent → human | Trace full user path, produce a plan, get approval |
+| 4 | PREPARE | glue | `scripts/new-worktree.sh` — branch from default in a worktree |
+| 5 | IMPLEMENT | agent | Write code + tests, wire into UI |
+| 6 | VERIFY | agent | Run `lint` locally; trust CI for tests |
+| 7 | SUBMIT | agent | Open **draft** PR, comment Jira, transition to In Review |
+| 8 | WATCH | glue | `scripts/watch-pr.sh` — polls, computes blocker fingerprint |
+| 9 | FIX + LEARN | agent | When fingerprint changes: address comments, push fixes, record lessons |
 
 ## Commands
 
-| Task                             | Command                                                     |
-| -------------------------------- | ----------------------------------------------------------- |
-| Watch a PR's checks/comments     | `./scripts/watch-pr.sh <owner>/<repo> <pr-number>`          |
-| Dump PR feedback for the agent   | `./scripts/fetch-pr-feedback.sh <owner>/<repo> <pr-number>` |
-| Create a branch in a target repo | `./scripts/new-branch.sh <repo-name> <branch-name>`         |
-| List repos under `~/Workspace/`  | `./scripts/list-repos.sh`                                   |
+| Task | Command |
+|---|---|
+| Create a worktree for a task | `./scripts/new-worktree.sh <repo> <TICKET>-<summary>` |
+| Watch a PR (blocker fingerprint) | `./scripts/watch-pr.sh <owner>/<repo> <pr-number>` |
+| Watch + auto-trigger fix on change | `./scripts/watch-pr.sh <owner>/<repo> <pr-number> --on-change '<cmd>'` |
+| Dump PR feedback for the agent | `./scripts/fetch-pr-feedback.sh <owner>/<repo> <pr-number>` |
+| Create a branch (no worktree) | `./scripts/new-branch.sh <repo> <branch>` |
+| List repos under `~/Workspace/` | `./scripts/list-repos.sh` |
 
-## Learning from PR reviews
+### End-to-end autonomous loop
 
-The agent closes the loop on every PR:
+```bash
+# 1. Kick off: ticket → draft PR
+copilot --add-dir ~/Workspace --allow-all-tools \
+  -p "Follow AGENTS.md. Take HUB-12345 and produce a draft PR."
 
-1. **Respond** — `respond-to-pr-review` prompt: fetch unresolved comments, push fixes, reply on each thread.
-2. **Learn** — `learn-from-pr` prompt: distill durable lessons into memory so the next PR avoids the same feedback.
-   - Repo-specific rules → `/memories/repo/<target-repo>.md`
-   - User-wide preferences → `/memories/<topic>.md` (auto-loaded into every conversation)
+# 2. Let the watch loop auto-dispatch fixes on every blocker change
+./scripts/watch-pr.sh qlik-trial/hub-parcels 4521 --on-change \
+  'copilot --add-dir ~/Workspace --allow-all-tools \
+     -p "Follow AGENTS.md stage 9. Respond to review on hub-parcels#4521 and learn from it."'
+```
 
-See [AGENTS.md](AGENTS.md) for the full agent contract.
+## Prompts
+
+- [starter](.github/prompts/starter.prompt.md) — the full 9-stage loop entry point
+- [triage-jira](.github/prompts/triage-jira.prompt.md) — read-only scoping + plan
+- [take-jira-ticket](.github/prompts/take-jira-ticket.prompt.md) — implement to draft PR
+- [open-pr](.github/prompts/open-pr.prompt.md) — PR-only step for a pushed branch
+- [respond-to-pr-review](.github/prompts/respond-to-pr-review.prompt.md) — address comments, push, reply
+- [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) — distill lessons into memory
+
+## Learning — the config IS the memory
+
+Every PR teaches the factory. After each fix cycle, lessons are classified:
+
+- **Repo-specific rules** → `~/Workspace/<repo>/.factory/lessons.md` (committed, shared with team) or `/memories/repo/<repo>.md` (local Copilot memory)
+- **User-wide preferences** → `/memories/<topic>.md` (auto-loaded into every conversation)
+- **One-offs** → discarded
+
+See [.factory/lessons.md](.factory/lessons.md) for the seed template and [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) for the classification rules.
+
+## Mindset
+
+- **Sloppy first.** Throughput over polish — you refine the prompts as you learn.
+- **Every interaction is training data.** PR comments, CI failures, clarifications — capture them.
+- **You're a PM now.** You set intent; the agent writes; you review the diff.
+- **The PR is the interface.** Leave a review comment, the factory reacts.
+- **Motion over architecture.** Run it on a real ticket.
+
+## Non-negotiables
+
+1. Never edit code in this factory repo to implement a ticket — always the target repo.
+2. Never commit to `main`. Always a feature branch in a worktree.
+3. Open PRs as **draft**. Humans decide when they're ready.
+4. Never silence a failing check. Fix it or surface it.
+5. Don't filter PR comments/CI logs before the agent sees them — raw data only.
+6. If stuck, exit non-zero. Don't loop forever.
