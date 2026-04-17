@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# factory — fire-and-forget Jira ticket → draft PR (+ optional watch+auto-fix)
+#
+# Usage:
+#   factory <TICKET> [--watch] [--no-auto-fix]
+#
+# Examples:
+#   factory HUB-12345               # ticket → draft PR, return PR URL, done
+#   factory HUB-12345 --watch       # same, then tail the watch loop with auto-fix
+#
+# Env:
+#   FACTORY_MODEL   — override model (passed to copilot --model)
+#   FACTORY_DRY_RUN — 1 to print the copilot command without running it
+set -euo pipefail
+
+FACTORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+TICKET="${1:-}"
+if [[ -z "$TICKET" ]]; then
+  echo "usage: factory <TICKET> [--watch] [--no-auto-fix]" >&2
+  exit 2
+fi
+shift || true
+
+WATCH=0
+AUTO_FIX=1
+for arg in "$@"; do
+  case "$arg" in
+    --watch) WATCH=1 ;;
+    --no-auto-fix) AUTO_FIX=0 ;;
+    *) echo "unknown arg: $arg" >&2; exit 2 ;;
+  esac
+done
+
+# Pre-flight — fail fast, no prompts.
+command -v copilot >/dev/null || { echo "copilot CLI not installed: npm i -g @github/copilot" >&2; exit 1; }
+command -v gh      >/dev/null || { echo "gh CLI not installed: brew install gh" >&2; exit 1; }
+command -v jq      >/dev/null || { echo "jq not installed: brew install jq" >&2; exit 1; }
+gh auth status >/dev/null 2>&1 || { echo "gh not authenticated: run 'gh auth login'" >&2; exit 1; }
+
+PROMPT_FILE="$FACTORY_ROOT/.github/prompts/autopilot.prompt.md"
+[[ -f "$PROMPT_FILE" ]] || { echo "missing prompt: $PROMPT_FILE" >&2; exit 1; }
+
+# Build the one-shot prompt: full autopilot contract + the ticket key.
+FULL_PROMPT="$(cat "$PROMPT_FILE")
+
+---
+
+TICKET = $TICKET
+
+Execute now. Do not ask questions. End with the FACTORY_RESULT line."
+
+CMD=(copilot --add-dir "$HOME/Workspace" --allow-all-tools --no-color)
+[[ -n "${FACTORY_MODEL:-}" ]] && CMD+=(--model "$FACTORY_MODEL")
+CMD+=(-p "$FULL_PROMPT")
+
+if [[ "${FACTORY_DRY_RUN:-0}" == "1" ]]; then
+  printf '%q ' "${CMD[@]}"; echo
+  exit 0
+fi
+
+echo "▶ factory: $TICKET  (autopilot, no questions)"
+echo "▶ logs will stream below; PR URL appears on the FACTORY_RESULT line at the end"
+echo "───────────────────────────────────────────────────────────────"
+
+# Run copilot, mirror output, capture for the result line.
+LOG="$(mktemp -t factory-"$TICKET".XXXXXX)"
+# shellcheck disable=SC2024
+cd "$FACTORY_ROOT"
+if ! "${CMD[@]}" 2>&1 | tee "$LOG"; then
+  echo "✖ factory: copilot exited non-zero; see $LOG" >&2
+  exit 1
+fi
+
+RESULT="$(grep -E '^FACTORY_(RESULT|BLOCKED)' "$LOG" | tail -1 || true)"
+if [[ -z "$RESULT" ]]; then
+  echo "✖ factory: agent did not emit FACTORY_RESULT line; see $LOG" >&2
+  exit 1
+fi
+if [[ "$RESULT" == FACTORY_BLOCKED:* ]]; then
+  echo "✖ $RESULT" >&2
+  exit 1
+fi
+
+echo
+echo "───────────────────────────────────────────────────────────────"
+echo "✔ $RESULT"
+
+PR_URL="$(sed -n 's/.*pr=\([^ ]*\).*/\1/p'  <<<"$RESULT")"
+REPO="$(  sed -n 's/.*repo=\([^ ]*\).*/\1/p' <<<"$RESULT")"
+PR_NUM="${PR_URL##*/}"
+
+if [[ "$WATCH" == "1" && -n "$PR_URL" && -n "$REPO" && -n "$PR_NUM" ]]; then
+  echo
+  echo "▶ factory: handing off to watch loop for $REPO#$PR_NUM"
+  ON_CHANGE_ARGS=()
+  if [[ "$AUTO_FIX" == "1" ]]; then
+    FIX_PROMPT="Follow AGENTS.md stage 9. Respond to all review feedback on $REPO#$PR_NUM, push fixes, reply per thread, then run learn-from-pr. Do not ask questions. End with FACTORY_RESULT."
+    ON_CHANGE_ARGS=(--on-change "cd '$FACTORY_ROOT' && copilot --add-dir '$HOME/Workspace' --allow-all-tools --no-color -p \"$FIX_PROMPT\"")
+  fi
+  exec "$FACTORY_ROOT/scripts/watch-pr.sh" "$REPO" "$PR_NUM" "${ON_CHANGE_ARGS[@]}"
+fi

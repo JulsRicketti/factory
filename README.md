@@ -23,62 +23,89 @@ Sibling folders under `~/Workspace/` — e.g. `hub-parcels`, `hub`, `hub-common`
 
 Verify each of these before running the factory for the first time.
 
-| Tool | Install | Verify |
-|---|---|---|
-| GitHub CLI | `brew install gh && gh auth login` | `gh auth status` |
-| Copilot CLI | `npm install -g @github/copilot` | `copilot --version` |
-| `jq` (used by watch loop) | `brew install jq` | `jq --version` |
-| GitHub token for scripts | [Create PAT](https://github.com/settings/tokens) (scopes: `repo`, `read:org`) | `echo $GITHUB_TOKEN` |
-| MCP servers in VS Code | Accept the startup prompt from `.vscode/mcp.json` | Chat 🔧 → see `mcp_github_*`, `mcp_jira_*` |
-| MCP servers in Copilot CLI | Already declared in `.mcp.json` at repo root | `copilot mcp list` |
+| Tool                       | Install                                                                       | Verify                                     |
+| -------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------ |
+| GitHub CLI                 | `brew install gh && gh auth login`                                            | `gh auth status`                           |
+| Copilot CLI                | `npm install -g @github/copilot`                                              | `copilot --version`                        |
+| `jq` (used by watch loop)  | `brew install jq`                                                             | `jq --version`                             |
+| GitHub token for scripts   | [Create PAT](https://github.com/settings/tokens) (scopes: `repo`, `read:org`) | `echo $GITHUB_TOKEN`                       |
+| MCP servers in VS Code     | Accept the startup prompt from `.vscode/mcp.json`                             | Chat 🔧 → see `mcp_github_*`, `mcp_jira_*` |
+| MCP servers in Copilot CLI | Already declared in `.mcp.json` at repo root                                  | `copilot mcp list`                         |
 
 > ⚠️ **VS Code MCP config does NOT carry over to the CLI.** They're different files (`.vscode/mcp.json` vs `.mcp.json` / `~/.copilot/mcp-config.json`). Both are already set up here.
 
-## Quick start — VS Code
+## Quick start — one command, zero questions
+
+```bash
+~/Workspace/factory/scripts/factory HUB-12345
+```
+
+That's it. The agent picks the target repo, creates a worktree, implements, lints, pushes, opens a **draft** PR, comments Jira, and prints the PR URL. No questions, no approval prompts.
+
+Add the autopilot loop (watch + auto-fix on every review comment / CI change):
+
+```bash
+~/Workspace/factory/scripts/factory HUB-12345 --watch
+```
+
+Put the factory on your `PATH` so you can just type `factory HUB-12345` from anywhere:
+
+```bash
+echo 'export PATH="$HOME/Workspace/factory/scripts:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+factory HUB-12345
+```
+
+Environment overrides:
+
+- `FACTORY_MODEL=claude-opus-4.7` — pin a specific model
+- `FACTORY_DRY_RUN=1` — print the `copilot` command without running
+- `FACTORY_WATCH_INTERVAL=30` — seconds between PR polls
+
+## Quick start — VS Code (interactive)
+
+If you want to watch the agent work and steer it:
 
 1. `code ~/Workspace/factory`
 2. Accept the MCP startup prompts (GitHub + Atlassian).
 3. Open Chat, pick the **Factory** mode, say:
    > Take HUB-12345 and implement it.
 
-## Quick start — Copilot CLI
+## Under the hood — Copilot CLI
 
-```bash
-cd ~/Workspace/factory
-copilot mcp list                                           # confirm github + atlassian
-copilot --add-dir ~/Workspace -p @.github/prompts/starter.prompt.md
-```
+`scripts/factory` is a thin wrapper around:
 
-Or inline (non-interactive):
 ```bash
 copilot --add-dir ~/Workspace --allow-all-tools \
-  -p "Follow AGENTS.md. Take HUB-12345 and produce a draft PR."
+  -p "$(cat .github/prompts/autopilot.prompt.md)\n\nTICKET = HUB-12345"
 ```
+
+Read [.github/prompts/autopilot.prompt.md](.github/prompts/autopilot.prompt.md) — that file is the full contract. Edit it to change how the factory decides things.
 
 ## The 9 stages
 
-| # | Stage | Owner | What happens |
-|---|---|---|---|
-| 1 | INGEST | agent | Fetch Jira ticket + all comments (raw, unfiltered) |
-| 2 | UNDERSTAND | agent | Read target repo's AGENTS.md, workflows, sample files |
-| 3 | PLAN | agent → human | Trace full user path, produce a plan, get approval |
-| 4 | PREPARE | glue | `scripts/new-worktree.sh` — branch from default in a worktree |
-| 5 | IMPLEMENT | agent | Write code + tests, wire into UI |
-| 6 | VERIFY | agent | Run `lint` locally; trust CI for tests |
-| 7 | SUBMIT | agent | Open **draft** PR, comment Jira, transition to In Review |
-| 8 | WATCH | glue | `scripts/watch-pr.sh` — polls, computes blocker fingerprint |
-| 9 | FIX + LEARN | agent | When fingerprint changes: address comments, push fixes, record lessons |
+| #   | Stage       | Owner         | What happens                                                           |
+| --- | ----------- | ------------- | ---------------------------------------------------------------------- |
+| 1   | INGEST      | agent         | Fetch Jira ticket + all comments (raw, unfiltered)                     |
+| 2   | UNDERSTAND  | agent         | Read target repo's AGENTS.md, workflows, sample files                  |
+| 3   | PLAN        | agent → human | Trace full user path, produce a plan, get approval                     |
+| 4   | PREPARE     | glue          | `scripts/new-worktree.sh` — branch from default in a worktree          |
+| 5   | IMPLEMENT   | agent         | Write code + tests, wire into UI                                       |
+| 6   | VERIFY      | agent         | Run `lint` locally; trust CI for tests                                 |
+| 7   | SUBMIT      | agent         | Open **draft** PR, comment Jira, transition to In Review               |
+| 8   | WATCH       | glue          | `scripts/watch-pr.sh` — polls, computes blocker fingerprint            |
+| 9   | FIX + LEARN | agent         | When fingerprint changes: address comments, push fixes, record lessons |
 
 ## Commands
 
-| Task | Command |
-|---|---|
-| Create a worktree for a task | `./scripts/new-worktree.sh <repo> <TICKET>-<summary>` |
-| Watch a PR (blocker fingerprint) | `./scripts/watch-pr.sh <owner>/<repo> <pr-number>` |
+| Task                               | Command                                                                |
+| ---------------------------------- | ---------------------------------------------------------------------- |
+| Create a worktree for a task       | `./scripts/new-worktree.sh <repo> <TICKET>-<summary>`                  |
+| Watch a PR (blocker fingerprint)   | `./scripts/watch-pr.sh <owner>/<repo> <pr-number>`                     |
 | Watch + auto-trigger fix on change | `./scripts/watch-pr.sh <owner>/<repo> <pr-number> --on-change '<cmd>'` |
-| Dump PR feedback for the agent | `./scripts/fetch-pr-feedback.sh <owner>/<repo> <pr-number>` |
-| Create a branch (no worktree) | `./scripts/new-branch.sh <repo> <branch>` |
-| List repos under `~/Workspace/` | `./scripts/list-repos.sh` |
+| Dump PR feedback for the agent     | `./scripts/fetch-pr-feedback.sh <owner>/<repo> <pr-number>`            |
+| Create a branch (no worktree)      | `./scripts/new-branch.sh <repo> <branch>`                              |
+| List repos under `~/Workspace/`    | `./scripts/list-repos.sh`                                              |
 
 ### End-to-end autonomous loop
 
