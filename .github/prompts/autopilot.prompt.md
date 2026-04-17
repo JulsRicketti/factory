@@ -40,7 +40,7 @@ Derive from the ticket summary + acceptance criteria. Don't paraphrase — be sp
 5. **IMPLEMENT** — write code + tests + wire into UI/entry point. Follow repo conventions exactly.
 6. **VERIFY** — run the repo's `lint` command. Fix every warning. Do NOT run the full test suite — trust CI.
 7. **COMMIT + PUSH** — conventional commit message. `git push -u origin <branch>`.
-8. **SUBMIT** — open a **DRAFT** PR via GitHub MCP. Title `[<TICKET>] <summary>`. Body must include:
+8. **SUBMIT** — open a **DRAFT** PR via GitHub MCP. Title uses Conventional Commits with the Jira ticket as the scope, e.g. `fix(HUB-12345): <summary>` (or `feat(...)`, `chore(...)`, `refactor(...)`, etc.). Immediately post a `#devbuild-test` comment on the PR to trigger the dev build pipeline. Body must include:
    - Jira link
    - Summary of changes
    - `## Assumptions` — every decision you made without asking

@@ -24,9 +24,10 @@ Steps:
 4. Load the target repo's `AGENTS.md` and instruction files. Implement the change following its conventions.
 5. Run the repo's `test` and `lint` scripts. Fix failures.
 6. Commit: `feat(<scope>): <summary> (<TICKET>)`.
-7. Push and open a PR via the GitHub MCP. Title: `[<TICKET>] <summary>`. Body must include Jira link, change summary, and test plan.
-8. Add a comment on the Jira ticket with the PR URL. Fetch valid transitions and move the ticket to _In Review_.
-9. Return to the user: branch name, PR URL, Jira URL.
+7. Push and open a PR via the GitHub MCP as a **draft**. Title uses Conventional Commits with the Jira ticket as the scope, e.g. `fix(HUB-12345): short summary` (or `feat(...)`, `chore(...)`, `refactor(...)`, etc. — pick the type that matches the change). Body must include the Jira link, change summary, and test plan.
+8. Immediately after opening the PR, post a comment containing `#devbuild-test` to trigger the dev build pipeline. This is mandatory for every PR the factory creates.
+9. Add a comment on the Jira ticket with the PR URL. Fetch valid transitions and move the ticket to _In Review_.
+10. Return to the user: branch name, PR URL, Jira URL.
 
 Do **not**:
 - Commit to `main`.

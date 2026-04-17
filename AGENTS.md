@@ -76,8 +76,9 @@ Or use the helper: `~/Workspace/factory/scripts/new-worktree.sh <target-repo> <T
 ### 7. SUBMIT (draft PR)
 
 - Open the PR via the GitHub MCP as a **draft**. Never mark it ready yourself.
-- Title: `[<TICKET>] <summary>`.
+- **Title format: Conventional Commits with the Jira ticket in the scope.** e.g. `fix(HUB-1234): short summary`, `feat(HUB-1234): ...`, `chore(HUB-1234): ...`, `refactor(HUB-1234): ...`. Type is chosen from the change kind (bug → `fix`, new capability → `feat`, non-functional → `chore`/`refactor`/`docs`/`test`/`style`). Do **not** use the old `[HUB-1234] ...` bracket format.
 - Body must include: Jira link, change summary, test plan, screenshots/recordings for UI.
+- **Immediately after opening the PR, post a comment containing `#devbuild-test`.** This triggers the dev build pipeline and must happen for every PR the factory creates, every time.
 - Comment on Jira with the PR URL. Transition the ticket to _In Review_.
 
 ### 8. WATCH
