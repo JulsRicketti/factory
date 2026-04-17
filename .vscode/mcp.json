@@ -1,0 +1,15 @@
+{
+  "servers": {
+    "github": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp/",
+      "gallery": true
+    },
+    "atlassian": {
+      "type": "http",
+      "url": "https://mcp.atlassian.com/v1/sse",
+      "gallery": true
+    }
+  },
+  "inputs": []
+}
