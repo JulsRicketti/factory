@@ -19,25 +19,98 @@ This repo does **not** contain product code. It contains:
 
 Sibling folders under `~/Workspace/` — e.g. `hub-parcels`, `hub`, `hub-common`, `mc-parcels`. The agent operates on whichever repo a Jira ticket points to, always via a **git worktree** so your main checkout stays clean.
 
-## Pre-flight checklist
+## First-time setup
 
-Verify each of these before running the factory for the first time.
+Run these once on a new machine. Every step is idempotent.
 
-| Tool                       | Install                                                                       | Verify                                     |
-| -------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------ |
-| GitHub CLI                 | `brew install gh && gh auth login`                                            | `gh auth status`                           |
-| Copilot CLI                | `npm install -g @github/copilot`                                              | `copilot --version`                        |
-| `jq` (used by watch loop)  | `brew install jq`                                                             | `jq --version`                             |
-| GitHub token for scripts   | [Create PAT](https://github.com/settings/tokens) (scopes: `repo`, `read:org`) | `echo $GITHUB_TOKEN`                       |
-| MCP servers in VS Code     | Accept the startup prompt from `.vscode/mcp.json`                             | Chat 🔧 → see `mcp_github_*`, `mcp_jira_*` |
-| MCP servers in Copilot CLI | Already declared in `.mcp.json` at repo root                                  | `copilot mcp list`                         |
+### 1. Install prerequisites
 
-> ⚠️ **VS Code MCP config does NOT carry over to the CLI.** They're different files (`.vscode/mcp.json` vs `.mcp.json` / `~/.copilot/mcp-config.json`). Both are already set up here.
+```bash
+# macOS — Homebrew
+brew install gh jq
+npm install -g @github/copilot
+```
+
+| Tool        | Verify              |
+| ----------- | ------------------- |
+| GitHub CLI  | `gh --version`      |
+| Copilot CLI | `copilot --version` |
+| `jq`        | `jq --version`      |
+
+### 2. Authenticate
+
+```bash
+gh auth login                              # browser flow, pick GitHub.com + HTTPS
+gh auth status                             # confirm
+```
+
+Create a [GitHub PAT](https://github.com/settings/tokens) (scopes: `repo`, `read:org`) and export it — some helper scripts use it directly:
+
+```bash
+echo 'export GITHUB_TOKEN=ghp_xxx' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### 3. Clone the factory next to your target repos
+
+```bash
+mkdir -p ~/Workspace && cd ~/Workspace
+gh repo clone <your-org>/factory         # or: git clone <url> factory
+```
+
+Your layout should look like:
+
+```
+~/Workspace/
+├── factory/          # ← this repo (control plane)
+├── hub-parcels/      # ← target repos (where code lands)
+├── hub/
+└── …
+```
+
+### 4. Put the factory on your PATH
+
+```bash
+echo 'export PATH="$HOME/Workspace/factory/scripts:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+command -v factory                         # → /Users/you/Workspace/factory/scripts/factory
+```
+
+Now `factory` and `factory-watch` work from any directory.
+
+### 5. Register MCP servers
+
+**Copilot CLI** — already declared in [.mcp.json](.mcp.json). Verify:
+
+```bash
+cd ~/Workspace/factory
+copilot mcp list                           # must show: github + atlassian
+```
+
+On first use, Copilot CLI will prompt you to authenticate each MCP server in a browser (Jira/Atlassian OAuth, GitHub OAuth). Approve them.
+
+**VS Code** (optional, for the interactive chat mode) — already declared in [.vscode/mcp.json](.vscode/mcp.json). Open the folder in VS Code and accept the startup prompts:
+
+```bash
+code ~/Workspace/factory
+```
+
+Then in Chat, click 🔧 and confirm `mcp_github_*` and `mcp_jira_*` tools are listed.
+
+> ⚠️ **VS Code and CLI read different MCP config files** (`.vscode/mcp.json` vs `.mcp.json`). Both are already set up here — you just need to authenticate each side once.
+
+### 6. Smoke test
+
+```bash
+FACTORY_DRY_RUN=1 factory HUB-0       # prints the copilot command without running
+```
+
+If it prints a `copilot --add-dir … -p …` line, you're ready.
 
 ## Quick start — one command, zero questions
 
 ```bash
-~/Workspace/factory/scripts/factory HUB-12345
+factory HUB-12345
 ```
 
 That's it. The agent picks the target repo, creates a worktree, implements, lints, pushes, opens a **draft** PR, comments Jira, and prints the PR URL. No questions, no approval prompts.
@@ -45,37 +118,20 @@ That's it. The agent picks the target repo, creates a worktree, implements, lint
 Add the autopilot loop (watch + auto-fix on every review comment / CI change):
 
 ```bash
-~/Workspace/factory/scripts/factory HUB-12345 --watch
+factory HUB-12345 --watch
 ```
 
-### Attach to an existing PR
-
-Someone reviewed an older PR — attach a watch loop to it (auto-fix on every blocker change):
+Attach an autopilot loop to a **PR that already exists**:
 
 ```bash
 factory-watch https://github.com/qlik-trial/hub-parcels/pull/4521
+# or
 factory-watch qlik-trial/hub-parcels#4521
-factory-watch qlik-trial/hub-parcels 4521
-
-# From inside the repo's checkout — infers the owner/repo from `gh`:
+# or (run from inside the repo)
 cd ~/Workspace/hub-parcels && factory-watch 4521
-
-# Watch only, don't auto-fix (just print state changes):
-factory-watch 4521 --no-auto-fix
 ```
 
-### Put it on your `PATH`
-
-So you can type `factory` / `factory-watch` from anywhere:
-
-```bash
-echo 'export PATH="$HOME/Workspace/factory/scripts:$PATH"' >> ~/.zshrc
-source ~/.zshrc
-factory HUB-12345
-factory-watch 4521
-```
-
-### Environment overrides
+Environment overrides:
 
 - `FACTORY_MODEL=claude-opus-4.7` — pin a specific model
 - `FACTORY_DRY_RUN=1` — print the `copilot` command without running
@@ -117,45 +173,59 @@ Read [.github/prompts/autopilot.prompt.md](.github/prompts/autopilot.prompt.md) 
 
 ## Commands
 
-Top-level entry points (use these day-to-day):
+The two you'll use daily:
 
-| Task | Command |
-| --- | --- |
-| Ticket → draft PR (autopilot, no questions) | `factory <TICKET>` |
-| Same, then watch + auto-fix until merged | `factory <TICKET> --watch` |
-| Same, but don't auto-fix — just watch | `factory <TICKET> --watch --no-auto-fix` |
-| Attach watch+auto-fix to an existing PR | `factory-watch <pr-url \| owner/repo#num \| num>` |
-| Watch existing PR, no auto-fix | `factory-watch <pr> --no-auto-fix` |
-| Print the `copilot` command without running | `FACTORY_DRY_RUN=1 factory <TICKET>` |
+| Task                                | Command                                    |
+| ----------------------------------- | ------------------------------------------ |
+| Ticket → draft PR (fire-and-forget) | `factory <TICKET>`                         |
+| Ticket → draft PR + autopilot watch | `factory <TICKET> --watch`                 |
+| Attach autopilot to an existing PR  | `factory-watch <pr-url \| owner/repo#num>` |
+| Watch an existing PR (no auto-fix)  | `factory-watch <pr-ref> --no-auto-fix`     |
 
-Low-level helpers (the entry points above compose these):
+Lower-level helpers (called by the above, usable standalone):
 
-| Task | Command |
-| --- | --- |
-| Create a worktree for a task | `./scripts/new-worktree.sh <repo> <TICKET>-<summary>` |
-| Raw watch loop (custom on-change hook) | `./scripts/watch-pr.sh <owner>/<repo> <pr-number> [--on-change '<cmd>']` |
-| Dump raw PR feedback for inspection | `./scripts/fetch-pr-feedback.sh <owner>/<repo> <pr-number>` |
-| Create a branch (no worktree) | `./scripts/new-branch.sh <repo> <branch>` |
-| List repos under `~/Workspace/` | `./scripts/list-repos.sh` |
+| Task                                 | Command                                                      |
+| ------------------------------------ | ------------------------------------------------------------ |
+| Create a worktree for a task         | `new-worktree.sh <repo> <TICKET>-<summary>`                  |
+| Raw watch loop (blocker fingerprint) | `watch-pr.sh <owner>/<repo> <pr-number>`                     |
+| Raw watch loop + custom hook         | `watch-pr.sh <owner>/<repo> <pr-number> --on-change '<cmd>'` |
+| Dump raw PR feedback for the agent   | `fetch-pr-feedback.sh <owner>/<repo> <pr-number>`            |
+| Create a branch (no worktree)        | `new-branch.sh <repo> <branch>`                              |
+| List repos under `~/Workspace/`      | `list-repos.sh`                                              |
 
 ### End-to-end autonomous loop
 
 ```bash
-# Terminal A — ticket to draft PR to merged, all in one
+# Morning — new ticket, walk away
 factory HUB-12345 --watch
 
-# Terminal B — separately, babysit an older PR that's getting reviewed now
+# Later — someone reviewed an older PR, attach autopilot to it
 factory-watch qlik-trial/hub-parcels#4500
+```
+
+Equivalent without the wrappers (what they run under the hood):
+
+```bash
+# 1. Kick off: ticket → draft PR
+copilot --add-dir ~/Workspace --allow-all-tools \
+  -p "$(cat .github/prompts/autopilot.prompt.md)
+
+TICKET = HUB-12345"
+
+# 2. Watch loop with auto-fix hook
+./scripts/watch-pr.sh qlik-trial/hub-parcels 4521 --on-change \
+  'copilot --add-dir ~/Workspace --allow-all-tools \
+     -p "Follow AGENTS.md stage 9. Respond to review on hub-parcels#4521 and learn from it."'
 ```
 
 ## Prompts
 
-- [autopilot](.github/prompts/autopilot.prompt.md) — **used by `factory <TICKET>`**; zero questions, zero approvals
+- [autopilot](.github/prompts/autopilot.prompt.md) — **default**: zero-questions ticket → draft PR (used by `factory`)
 - [starter](.github/prompts/starter.prompt.md) — interactive 9-stage loop (shows plan, waits for approval)
 - [triage-jira](.github/prompts/triage-jira.prompt.md) — read-only scoping + plan
-- [take-jira-ticket](.github/prompts/take-jira-ticket.prompt.md) — implement to draft PR
+- [take-jira-ticket](.github/prompts/take-jira-ticket.prompt.md) — implement to draft PR (interactive)
 - [open-pr](.github/prompts/open-pr.prompt.md) — PR-only step for a pushed branch
-- [respond-to-pr-review](.github/prompts/respond-to-pr-review.prompt.md) — **used by `factory-watch`**; address comments, push, reply
+- [respond-to-pr-review](.github/prompts/respond-to-pr-review.prompt.md) — address comments, push, reply
 - [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) — distill lessons into memory
 
 ## Learning — the config IS the memory
