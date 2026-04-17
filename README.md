@@ -34,9 +34,20 @@ Sibling folders under `~/Workspace/` — e.g. `hub-parcels`, `hub`, `hub-common`
 
 ## Commands
 
-| Task                            | Command                                            |
-| ------------------------------- | -------------------------------------------------- |
-| Watch a PR's checks/comments    | `./scripts/watch-pr.sh <owner>/<repo> <pr-number>` |
-| List repos under `~/Workspace/` | `./scripts/list-repos.sh`                          |
+| Task                             | Command                                                     |
+| -------------------------------- | ----------------------------------------------------------- |
+| Watch a PR's checks/comments     | `./scripts/watch-pr.sh <owner>/<repo> <pr-number>`          |
+| Dump PR feedback for the agent   | `./scripts/fetch-pr-feedback.sh <owner>/<repo> <pr-number>` |
+| Create a branch in a target repo | `./scripts/new-branch.sh <repo-name> <branch-name>`         |
+| List repos under `~/Workspace/`  | `./scripts/list-repos.sh`                                   |
+
+## Learning from PR reviews
+
+The agent closes the loop on every PR:
+
+1. **Respond** — `respond-to-pr-review` prompt: fetch unresolved comments, push fixes, reply on each thread.
+2. **Learn** — `learn-from-pr` prompt: distill durable lessons into memory so the next PR avoids the same feedback.
+   - Repo-specific rules → `/memories/repo/<target-repo>.md`
+   - User-wide preferences → `/memories/<topic>.md` (auto-loaded into every conversation)
 
 See [AGENTS.md](AGENTS.md) for the full agent contract.

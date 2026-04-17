@@ -67,6 +67,24 @@ git checkout -b <ticket-key>-<kebab-summary>
 
 - Return the branch name, PR URL, and Jira ticket URL to the user.
 
+### 9. Follow the PR through review (feedback loop)
+
+A PR is not done when it's opened — it's done when it's merged. The agent **must** close the loop:
+
+1. When the user returns with review activity (or asks you to check a PR), run the [respond-to-pr-review](.github/prompts/respond-to-pr-review.prompt.md) prompt.
+2. It dumps structured feedback via `./scripts/fetch-pr-feedback.sh`, addresses actionable comments, pushes fixes, and replies.
+3. After responding (and especially after merge/close), run the [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) prompt to distill durable lessons into memory.
+
+## Learning from reviews
+
+The agent improves over time by persisting lessons from PR feedback into memory. See [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) for the classification rules.
+
+- **Repo-specific corrections** → `/memories/repo/<target-repo>.md` (e.g. "never use Material UI" for `hub-parcels`).
+- **User preferences that span repos** → `/memories/<topic>.md` (user-scope, auto-loaded into context).
+- **One-offs / noise** → discard.
+
+Write short, imperative bullets. Check existing memory files first to avoid duplicates. Never record secrets, author names, or PR-specific details.
+
 ## Anti-patterns
 
 - Don't commit directly to `main` on any repo.
@@ -74,3 +92,5 @@ git checkout -b <ticket-key>-<kebab-summary>
 - Don't create duplicate Jira tickets — search first.
 - Don't mix unrelated work into one PR.
 - Don't invent repo conventions — defer to the target repo's own instructions.
+- Don't ignore PR review comments — address or explicitly defer every one.
+- Don't record every review comment as a memory — only recurring or principled lessons.
