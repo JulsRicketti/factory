@@ -27,3 +27,7 @@ This file is a _template_ — copy it to `~/Workspace/<target-repo>/.factory/les
 - `<repo>` style rules the reviewers actually enforce (they're often stricter than the linter).
 - `<repo>` renamed/deprecated modules — e.g. `SpaceDetails` → `WorkspaceDetailsPanel`.
 - `<repo>` required checks that the PR won't merge without.
+
+## Jira: Never use curl — use MCP tools
+**Lesson**: Do NOT read credentials from `~/Library/Application Support/Code/User/mcp.json` or any credential file to build curl/node HTTP requests to Jira. This prints API tokens in plaintext in terminal history and chat logs.
+**Rule**: Always use `mcp_jira_*` MCP tools (e.g. `mcp_jira_get_issue`, `mcp_jira_add_comment`, `mcp_jira_transition_issue`) for all Jira operations. These tools handle auth internally with no credential exposure.

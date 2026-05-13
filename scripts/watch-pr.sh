@@ -3,6 +3,7 @@
 #   (unresolved review comment ids + check-run conclusions + merge state).
 # When the fingerprint changes, print the new state. Optionally run a hook.
 #
+export GH_PAGER=cat
 # Usage: ./scripts/watch-pr.sh <owner>/<repo> <pr-number> [--on-change "<cmd>"]
 #
 # Examples:

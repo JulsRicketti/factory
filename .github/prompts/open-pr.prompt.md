@@ -20,7 +20,8 @@ Steps:
      - Summary
      - Test plan
      - Checklist (lint, tests, translations if applicable)
-6. Immediately after opening the PR, post a `#devbuild-test` comment on it to trigger the dev build pipeline.
-7. Comment on the Jira ticket with the PR URL.
-8. Fetch valid transitions and move the ticket to _In Review_.
-9. Return PR URL + Jira URL.
+6. Add the `agentic-loop` label to the PR via the GitHub MCP (e.g., using the add issue/PR labels tool).
+7. Immediately after opening the PR, post a `#devbuild-test` comment on it to trigger the dev build pipeline.
+8. Comment on the Jira ticket with the PR URL.
+9. Fetch valid transitions and move the ticket to _In Review_.
+10. Return PR URL + Jira URL.

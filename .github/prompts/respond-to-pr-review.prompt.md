@@ -15,7 +15,7 @@ Steps:
    - Classify: _actionable change_, _question_, _nit_, _won't-fix_, _already addressed_.
    - For actionable items, open the referenced file/line in the target repo.
    - Apply the minimum change that addresses the comment.
-3. Run the target repo's `lint` and `test` scripts. Fix regressions.
+3. Run the target repo's `lint` script (blocking). If tests must be run, run them in **background mode** (`isBackground: true` / `mode: async`) so they don't block the conversation — tail the output via `get_terminal_output` when you need the result. Fix regressions.
 4. Commit with a message like `fix: address review comments (<TICKET>)`. Use separate commits per logical concern when practical.
 5. `git push` to the PR branch. Never force-push unless the user approves.
 6. Reply to each review thread via the GitHub MCP:
