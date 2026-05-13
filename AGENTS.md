@@ -77,6 +77,7 @@ Or use the helper: `~/Workspace/factory/scripts/new-worktree.sh <target-repo> <T
 ### 7. SUBMIT (draft PR)
 
 - Open the PR via the GitHub MCP as a **draft**. Never mark it ready yourself.
+- **Apply the `agentic-loop` label to the PR on creation** (create the label if it doesn't exist in the repo). Every PR the factory opens must carry this label.
 - **Title format: Conventional Commits with the Jira ticket in the scope.** e.g. `fix(HUB-1234): short summary`, `feat(HUB-1234): ...`, `chore(HUB-1234): ...`, `refactor(HUB-1234): ...`. Type is chosen from the change kind (bug → `fix`, new capability → `feat`, non-functional → `chore`/`refactor`/`docs`/`test`/`style`). Do **not** use the old `[HUB-1234] ...` bracket format.
 - Body must include: Jira link, change summary, test plan, screenshots/recordings for UI.
 - **Immediately after opening the PR, post a comment containing `#devbuild-test`.** This triggers the dev build pipeline and must happen for every PR the factory creates, every time.
@@ -85,6 +86,7 @@ Or use the helper: `~/Workspace/factory/scripts/new-worktree.sh <target-repo> <T
 ### 8. WATCH
 
 - Poll the PR every ~30s for: new review comments, CI conclusions, mergeable status, branch behind base.
+- **Acknowledge every new comment immediately by adding an `eyes` reaction** to it as soon as it's detected — applies to issue comments, PR review comments, and review-body comments. Skip comments authored by the factory itself. The reaction goes on before any analysis or fix work begins, so the human knows the comment was received.
 - Compute a **blocker fingerprint** — a hash of (unresolved comment ids + check-run conclusions + merge state). When the fingerprint changes, dispatch to stage 9.
 - Use `./scripts/watch-pr.sh <owner>/<repo> <pr-number>` to run this loop.
 
