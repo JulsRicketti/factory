@@ -34,6 +34,7 @@ Derive from the ticket summary + acceptance criteria. Don't paraphrase — be sp
 ## Execution — do all of this without stopping
 
 1. **INGEST** — `mcp_jira_get_issue <TICKET>`. Pull description, AC, comments, components, labels.
+   - **Agent gate:** scan the ticket description and comments for a line matching `factory-agent:\s*<name>` (case-insensitive). If found and `<name>` does not equal `CURRENT_AGENT`, stop immediately and emit exactly: `FACTORY_BLOCKED: wrong-agent expected=<name>` as your final line. Do NOT do any other work. The factory wrapper will re-launch with the requested agent.
 2. **PICK REPO** — apply the rules above. If no match, exit.
 3. **UNDERSTAND** — read the target repo's `AGENTS.md`, `.github/instructions/`, `.factory/lessons.md` if present, and one representative source+test pair.
 4. **PREPARE** — `~/Workspace/factory/scripts/new-worktree.sh <repo> <branch>`. `cd` into the worktree.

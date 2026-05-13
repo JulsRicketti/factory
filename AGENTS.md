@@ -36,6 +36,7 @@ The factory runs in **9 stages**. Stages 1–6 produce a draft PR. Stages 7–9 
 
 - `mcp_jira_get_issue` with the ticket key.
 - Pull the ticket description, acceptance criteria, linked issues, and all comments. Don't summarise — keep the raw text for later stages.
+- **Check for an agent directive**: if the ticket body or comments contain `factory-agent: <name>` (e.g. `factory-agent: claude`), and `<name>` differs from `CURRENT_AGENT`, abort with `FACTORY_BLOCKED: wrong-agent expected=<name>` so the wrapper relaunches with the right CLI. Supported names: `copilot`, `claude`, `codex`.
 - If the target repo is ambiguous, **ask the user**.
 
 ### 2. UNDERSTAND

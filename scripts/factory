@@ -2,15 +2,27 @@
 # factory — fire-and-forget Jira ticket → draft PR (+ optional watch+auto-fix)
 #
 # Usage:
-#   factory <TICKET> [--watch] [--no-auto-fix]
+#   factory <TICKET> [--watch] [--no-auto-fix] [--agent <name>]
 #
 # Examples:
-#   factory HUB-12345               # ticket → draft PR, return PR URL, done
-#   factory HUB-12345 --watch       # same, then tail the watch loop with auto-fix
+#   factory HUB-12345                       # ticket → draft PR, return PR URL, done
+#   factory HUB-12345 --watch               # same, then tail the watch loop with auto-fix
+#   factory HUB-12345 --agent claude        # run the job via the claude CLI instead of copilot
+#
+# Agents (CLI on PATH):
+#   copilot (default) | claude | codex
+#   Register more by adding a case to resolve_agent_cmd() below.
+#
+# Ticket-level override:
+#   If the Jira ticket body contains a line like `factory-agent: claude`, the
+#   autopilot will exit with `FACTORY_BLOCKED: wrong-agent expected=claude` on
+#   first run; this wrapper detects that and re-executes with the requested
+#   agent. Set --agent explicitly to skip the detection round-trip.
 #
 # Env:
-#   FACTORY_MODEL   — override model (passed to copilot --model)
-#   FACTORY_DRY_RUN — 1 to print the copilot command without running it
+#   FACTORY_AGENT   — default agent (overridden by --agent)
+#   FACTORY_MODEL   — override model (passed to the agent's --model flag)
+#   FACTORY_DRY_RUN — 1 to print the agent command without running it
 set -euo pipefail
 
 FACTORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -24,55 +36,96 @@ shift || true
 
 WATCH=0
 AUTO_FIX=1
-for arg in "$@"; do
-  case "$arg" in
-    --watch) WATCH=1 ;;
-    --no-auto-fix) AUTO_FIX=0 ;;
-    *) echo "unknown arg: $arg" >&2; exit 2 ;;
+AGENT="${FACTORY_AGENT:-copilot}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --watch) WATCH=1; shift ;;
+    --no-auto-fix) AUTO_FIX=0; shift ;;
+    --agent) AGENT="${2:-}"; shift 2 ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
 done
 
+# Map an agent name to the CLI invocation (array form, no -p yet).
+# Each branch must end up with CMD=(...) representing the agent + standard flags.
+resolve_agent_cmd() {
+  case "$1" in
+    copilot)
+      CMD=(copilot --add-dir "$HOME/Workspace" --allow-all-tools --no-color)
+      [[ -n "${FACTORY_MODEL:-}" ]] && CMD+=(--model "$FACTORY_MODEL")
+      ;;
+    claude)
+      CMD=(claude --add-dir "$HOME/Workspace" --dangerously-skip-permissions)
+      [[ -n "${FACTORY_MODEL:-}" ]] && CMD+=(--model "$FACTORY_MODEL")
+      ;;
+    codex)
+      CMD=(codex exec --full-auto)
+      [[ -n "${FACTORY_MODEL:-}" ]] && CMD+=(--model "$FACTORY_MODEL")
+      ;;
+    *)
+      echo "unknown agent: $1 (supported: copilot, claude, codex)" >&2
+      exit 2
+      ;;
+  esac
+  command -v "${CMD[0]}" >/dev/null || { echo "${CMD[0]} CLI not installed or not on PATH" >&2; exit 1; }
+}
+
 # Pre-flight — fail fast, no prompts.
-command -v copilot >/dev/null || { echo "copilot CLI not installed: npm i -g @github/copilot" >&2; exit 1; }
-command -v gh      >/dev/null || { echo "gh CLI not installed: brew install gh" >&2; exit 1; }
-command -v jq      >/dev/null || { echo "jq not installed: brew install jq" >&2; exit 1; }
+command -v gh >/dev/null || { echo "gh CLI not installed: brew install gh" >&2; exit 1; }
+command -v jq >/dev/null || { echo "jq not installed: brew install jq" >&2; exit 1; }
 gh auth status >/dev/null 2>&1 || { echo "gh not authenticated: run 'gh auth login'" >&2; exit 1; }
 
 PROMPT_FILE="$FACTORY_ROOT/.github/prompts/autopilot.prompt.md"
 [[ -f "$PROMPT_FILE" ]] || { echo "missing prompt: $PROMPT_FILE" >&2; exit 1; }
 
-# Build the one-shot prompt: full autopilot contract + the ticket key.
+# Build the one-shot prompt: full autopilot contract + the ticket key + current agent.
 FULL_PROMPT="$(cat "$PROMPT_FILE")
 
 ---
 
 TICKET = $TICKET
+CURRENT_AGENT = $AGENT
 
 Execute now. Do not ask questions. End with the FACTORY_RESULT line."
 
-CMD=(copilot --add-dir "$HOME/Workspace" --allow-all-tools --no-color)
-[[ -n "${FACTORY_MODEL:-}" ]] && CMD+=(--model "$FACTORY_MODEL")
-CMD+=(-p "$FULL_PROMPT")
+run_once() {
+  resolve_agent_cmd "$AGENT"
+  CMD+=(-p "$FULL_PROMPT")
 
-if [[ "${FACTORY_DRY_RUN:-0}" == "1" ]]; then
-  printf '%q ' "${CMD[@]}"; echo
-  exit 0
+  if [[ "${FACTORY_DRY_RUN:-0}" == "1" ]]; then
+    printf '%q ' "${CMD[@]}"; echo
+    exit 0
+  fi
+
+  echo "▶ factory: $TICKET  (autopilot via $AGENT, no questions)"
+  echo "▶ logs will stream below; PR URL appears on the FACTORY_RESULT line at the end"
+  echo "───────────────────────────────────────────────────────────────"
+
+  LOG="$(mktemp -t factory-"$TICKET".XXXXXX)"
+  # shellcheck disable=SC2024
+  cd "$FACTORY_ROOT"
+  if ! "${CMD[@]}" 2>&1 | tee "$LOG"; then
+    echo "✖ factory: $AGENT exited non-zero; see $LOG" >&2
+    exit 1
+  fi
+  RESULT="$(grep -E '^FACTORY_(RESULT|BLOCKED)' "$LOG" | tail -1 || true)"
+}
+
+run_once
+
+# Ticket-level agent override: autopilot emits FACTORY_BLOCKED: wrong-agent
+# expected=<name> when it detects a `factory-agent:` directive in the ticket.
+# Re-launch once with the requested agent.
+if [[ "$RESULT" =~ ^FACTORY_BLOCKED:[[:space:]]*wrong-agent[[:space:]]+expected=([A-Za-z0-9_-]+) ]]; then
+  REQUESTED="${BASH_REMATCH[1]}"
+  if [[ "$REQUESTED" != "$AGENT" ]]; then
+    echo "▶ factory: ticket requests agent=$REQUESTED — re-running"
+    AGENT="$REQUESTED"
+    FULL_PROMPT="${FULL_PROMPT/CURRENT_AGENT = */CURRENT_AGENT = $AGENT}"
+    run_once
+  fi
 fi
 
-echo "▶ factory: $TICKET  (autopilot, no questions)"
-echo "▶ logs will stream below; PR URL appears on the FACTORY_RESULT line at the end"
-echo "───────────────────────────────────────────────────────────────"
-
-# Run copilot, mirror output, capture for the result line.
-LOG="$(mktemp -t factory-"$TICKET".XXXXXX)"
-# shellcheck disable=SC2024
-cd "$FACTORY_ROOT"
-if ! "${CMD[@]}" 2>&1 | tee "$LOG"; then
-  echo "✖ factory: copilot exited non-zero; see $LOG" >&2
-  exit 1
-fi
-
-RESULT="$(grep -E '^FACTORY_(RESULT|BLOCKED)' "$LOG" | tail -1 || true)"
 if [[ -z "$RESULT" ]]; then
   echo "✖ factory: agent did not emit FACTORY_RESULT line; see $LOG" >&2
   exit 1
