@@ -85,8 +85,11 @@ Or use the helper: `~/Workspace/factory/scripts/new-worktree.sh <target-repo> <T
 
 ### 8. WATCH
 
-- Poll the PR every ~30s for: new review comments, CI conclusions, mergeable status, branch behind base.
-- **Acknowledge every new comment immediately by adding an `eyes` reaction** to it as soon as it's detected — applies to issue comments, PR review comments, and review-body comments. Skip comments authored by the factory itself. The reaction goes on before any analysis or fix work begins, so the human knows the comment was received.
+- Poll the PR every ~30s for new feedback from **all three** GitHub comment surfaces, CI conclusions, mergeable status, and branch-behind-base:
+  - `GET /repos/{owner}/{repo}/issues/{pr}/comments` — top-level PR conversation comments.
+  - `GET /repos/{owner}/{repo}/pulls/{pr}/comments` — inline review comments.
+  - `GET /repos/{owner}/{repo}/pulls/{pr}/reviews` — review submissions, including reviews with a body but no inline comments. **This surface is the one most commonly missed; a review-body-only comment will never appear in the other two endpoints.** Include each review's id, state, and body presence in the blocker fingerprint.
+- **Acknowledge every new comment immediately by adding an `eyes` reaction** to it as soon as it's detected — applies to issue comments, PR review comments, and review submissions (react on the review itself via `POST /repos/{owner}/{repo}/pulls/{pr}/reviews/{review_id}/reactions`). Skip comments authored by the factory itself. The reaction goes on before any analysis or fix work begins, so the human knows the comment was received.
 - Compute a **blocker fingerprint** — a hash of (unresolved comment ids + check-run conclusions + merge state). When the fingerprint changes, dispatch to stage 9.
 - Use `./scripts/watch-pr.sh <owner>/<repo> <pr-number>` to run this loop.
 

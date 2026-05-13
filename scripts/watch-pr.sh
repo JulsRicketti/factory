@@ -4,7 +4,10 @@
 # When the fingerprint changes, print the new state. Optionally run a hook.
 #
 export GH_PAGER=cat
-# Usage: ./scripts/watch-pr.sh <owner>/<repo> <pr-number> [--on-change "<cmd>"]
+# Usage: ./scripts/watch-pr.sh <owner>/<repo> <pr-number> [--on-change "<cmd>"] [--fix-on-start]
+#
+# --fix-on-start: also run the --on-change hook for the initial fingerprint,
+#   so any pending review feedback at startup is processed once.
 #
 # Examples:
 #   ./scripts/watch-pr.sh qlik-trial/hub-parcels 4521
@@ -21,9 +24,14 @@ REPO="$1"
 PR="$2"
 shift 2
 ON_CHANGE=""
-if [ "${1:-}" = "--on-change" ]; then
-  ON_CHANGE="${2:-}"
-fi
+FIX_ON_START=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --on-change) ON_CHANGE="${2:-}"; shift 2 ;;
+    --fix-on-start) FIX_ON_START=1; shift ;;
+    *) echo "unknown arg: $1" >&2; exit 2 ;;
+  esac
+done
 
 command -v gh >/dev/null   || { echo "gh CLI required" >&2; exit 1; }
 command -v jq >/dev/null   || { echo "jq required"     >&2; exit 1; }
@@ -36,6 +44,14 @@ fingerprint() {
   local comments
   comments=$(gh api "repos/$REPO/pulls/$PR/comments" --paginate \
     --jq '[.[] | select(.in_reply_to_id == null) | .id] | sort | join(",")' 2>/dev/null || echo "")
+  # issue comments (top-level PR conversation)
+  local issue_comments
+  issue_comments=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+    --jq '[.[] | .id] | sort | join(",")' 2>/dev/null || echo "")
+  # review submissions (review bodies — these are NOT in /pulls/.../comments)
+  local reviews
+  reviews=$(gh api "repos/$REPO/pulls/$PR/reviews" --paginate \
+    --jq '[.[] | select((.body // "") != "" or .state == "CHANGES_REQUESTED" or .state == "APPROVED") | "\(.id):\(.state)"] | sort | join(",")' 2>/dev/null || echo "")
   # check-run conclusions for HEAD
   local sha
   sha=$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid 2>/dev/null || echo "")
@@ -50,7 +66,7 @@ fingerprint() {
     --json mergeStateStatus,reviewDecision,isDraft,state \
     --jq '"\(.state)|\(.isDraft)|\(.mergeStateStatus)|\(.reviewDecision)"' 2>/dev/null || echo "")
 
-  printf "%s|%s|%s" "$comments" "$checks" "$meta" | shasum | awk '{print $1}'
+  printf "%s|%s|%s|%s|%s" "$comments" "$issue_comments" "$reviews" "$checks" "$meta" | shasum | awk '{print $1}'
 }
 
 print_state() {
@@ -77,7 +93,7 @@ while true; do
     clear
     print_state
     echo "  fingerprint: $FP  (was: ${LAST_FP:-<initial>})"
-    if [ -n "$ON_CHANGE" ] && [ -n "$LAST_FP" ]; then
+    if [ -n "$ON_CHANGE" ] && { [ -n "$LAST_FP" ] || [ "$FIX_ON_START" = "1" ]; }; then
       echo
       echo "--- running --on-change hook ---"
       bash -c "$ON_CHANGE" || echo "(hook exited non-zero)"

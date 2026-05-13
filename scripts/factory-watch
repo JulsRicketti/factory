@@ -4,6 +4,7 @@
 # Usage:
 #   factory-watch <pr>                    # watch + auto-fix (default)
 #   factory-watch <pr> --no-auto-fix      # watch only, just print state changes
+#   factory-watch <pr> --fix-on-start     # also fix pending feedback at startup
 #
 # <pr> accepts any of:
 #   https://github.com/qlik-trial/hub-parcels/pull/4521
@@ -23,10 +24,12 @@ if [[ $# -lt 1 ]]; then
 fi
 
 AUTO_FIX=1
+FIX_ON_START=0
 ARGS=()
 for a in "$@"; do
   case "$a" in
     --no-auto-fix) AUTO_FIX=0 ;;
+    --fix-on-start) FIX_ON_START=1 ;;
     *) ARGS+=("$a") ;;
   esac
 done
@@ -63,8 +66,11 @@ echo "▶ factory-watch: $REPO#$PR  (auto-fix: $([[ $AUTO_FIX == 1 ]] && echo on
 
 if [[ "$AUTO_FIX" == "1" ]]; then
   FIX_PROMPT="Follow AGENTS.md stage 9. Respond to all review feedback on $REPO#$PR, push fixes, reply per thread, then run learn-from-pr. Do not ask questions. End with FACTORY_RESULT."
+  EXTRA=()
+  [[ "$FIX_ON_START" == "1" ]] && EXTRA+=(--fix-on-start)
   exec "$FACTORY_ROOT/scripts/watch-pr.sh" "$REPO" "$PR" --on-change \
-    "cd '$FACTORY_ROOT' && copilot --add-dir '$HOME/Workspace' --allow-all-tools --no-color -p \"$FIX_PROMPT\""
+    "cd '$FACTORY_ROOT' && copilot --add-dir '$HOME/Workspace' --allow-all-tools --no-color -p \"$FIX_PROMPT\"" \
+    "${EXTRA[@]}"
 else
   exec "$FACTORY_ROOT/scripts/watch-pr.sh" "$REPO" "$PR"
 fi
