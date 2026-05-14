@@ -181,6 +181,23 @@ The two you'll use daily:
 | Ticket → draft PR + autopilot watch | `factory <TICKET> --watch`                 |
 | Attach autopilot to an existing PR  | `factory-watch <pr-url \| owner/repo#num>` |
 | Watch an existing PR (no auto-fix)  | `factory-watch <pr-ref> --no-auto-fix`     |
+| List all factory worktrees          | `factory-worktrees`                        |
+| Stop one factory worktree           | `factory-worktrees stop <id\|name>`        |
+| Stop every factory worktree         | `factory-worktrees stop --all`             |
+
+### Managing worktrees
+
+Every `factory <TICKET>` run creates a git worktree under `~/Workspace/.factory-worktrees/`. Over time these pile up — use `factory-worktrees` to see and clean them:
+
+```bash
+factory-worktrees                       # list (default)
+factory-worktrees stop 3                # remove by list index
+factory-worktrees stop HUB-2316         # remove by branch/path substring
+factory-worktrees stop --all            # nuke them all
+factory-worktrees prune                 # `git worktree prune` across every repo (clears stale registrations)
+```
+
+Flags: `--force` (drop uncommitted changes) and `--dry-run` (preview only). `stop` auto-retries with `--force` if a clean remove fails.
 
 Lower-level helpers (called by the above, usable standalone):
 

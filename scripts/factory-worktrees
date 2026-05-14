@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+# factory-worktrees — list and clean up factory git worktrees.
+#
+# Worktrees created by `new-worktree.sh` live under ~/Workspace/.factory-worktrees/
+# and are named `<repo>-<branch>`. This command finds them across every repo in
+# ~/Workspace and lets you remove one or all of them.
+#
+# Usage:
+#   factory-worktrees                       # list all factory worktrees (default)
+#   factory-worktrees list                  # same as above
+#   factory-worktrees stop <name|index>     # remove one worktree by path-suffix or list index
+#   factory-worktrees stop --all            # remove all factory worktrees
+#   factory-worktrees prune                 # `git worktree prune` every repo (cleans stale entries)
+#
+# Flags:
+#   --force   pass --force to `git worktree remove` (drop uncommitted changes)
+#   --dry-run print what would be removed without doing it
+set -euo pipefail
+
+WORKTREE_ROOT="$HOME/Workspace/.factory-worktrees"
+WORKSPACE="$HOME/Workspace"
+
+FORCE=0
+DRY=0
+ARGS=()
+for a in "$@"; do
+  case "$a" in
+    --force) FORCE=1 ;;
+    --dry-run) DRY=1 ;;
+    *) ARGS+=("$a") ;;
+  esac
+done
+set -- "${ARGS[@]:-}"
+
+SUB="${1:-list}"
+shift || true
+
+# Discover every factory worktree by scanning every repo in ~/Workspace and
+# matching paths under $WORKTREE_ROOT. Output format: <index> <repo> <branch> <path>
+discover() {
+  local i=0
+  for repo in "$WORKSPACE"/*; do
+    [ -d "$repo/.git" ] || continue
+    local repo_name
+    repo_name="$(basename "$repo")"
+    while IFS= read -r path; do
+      [ -z "$path" ] && continue
+      case "$path" in
+        "$WORKTREE_ROOT"/*) ;;
+        *) continue ;;
+      esac
+      local branch
+      branch="$(git -C "$repo" worktree list --porcelain | awk -v p="$path" '
+        $1=="worktree" && $2==p {found=1; next}
+        found && $1=="branch" {sub("refs/heads/","",$2); print $2; exit}
+        found && /^$/ {exit}
+      ')"
+      printf '%d\t%s\t%s\t%s\n' "$i" "$repo_name" "${branch:-(detached)}" "$path"
+      i=$((i+1))
+    done < <(git -C "$repo" worktree list --porcelain | awk '$1=="worktree"{print $2}')
+  done
+}
+
+cmd_list() {
+  local out
+  out="$(discover)"
+  if [ -z "$out" ]; then
+    echo "No factory worktrees found under $WORKTREE_ROOT"
+    return 0
+  fi
+  printf '%-4s  %-20s  %-50s  %s\n' "IDX" "REPO" "BRANCH" "PATH"
+  printf '%s\n' "$out" | awk -F'\t' '{printf "%-4s  %-20s  %-50s  %s\n", $1, $2, $3, $4}'
+}
+
+# Find the parent repo for a given worktree path by walking ~/Workspace.
+parent_repo_for() {
+  local path="$1"
+  for repo in "$WORKSPACE"/*; do
+    [ -d "$repo/.git" ] || continue
+    if git -C "$repo" worktree list --porcelain | awk '$1=="worktree"{print $2}' | grep -Fxq "$path"; then
+      echo "$repo"
+      return 0
+    fi
+  done
+  return 1
+}
+
+remove_one() {
+  local path="$1"
+  local repo
+  if ! repo="$(parent_repo_for "$path")"; then
+    echo "✖ no parent repo found for $path" >&2
+    return 1
+  fi
+  local flags=()
+  [ "$FORCE" = "1" ] && flags+=(--force)
+  if [ "$DRY" = "1" ]; then
+    echo "DRY: git -C $repo worktree remove ${flags[*]:-} $path"
+    return 0
+  fi
+  echo "▶ removing $path  (repo: $(basename "$repo"))"
+  git -C "$repo" worktree remove "${flags[@]}" "$path" || {
+    echo "  (retrying with --force)"
+    git -C "$repo" worktree remove --force "$path"
+  }
+}
+
+resolve_target() {
+  # Resolve a user-supplied <name|index> to a worktree path.
+  local target="$1"
+  local rows
+  rows="$(discover)"
+  # numeric index?
+  if [[ "$target" =~ ^[0-9]+$ ]]; then
+    awk -F'\t' -v i="$target" '$1==i{print $4}' <<<"$rows"
+    return
+  fi
+  # exact path match
+  if grep -Fq "	$target" <<<"$rows"; then
+    awk -F'\t' -v p="$target" '$4==p{print $4}' <<<"$rows"
+    return
+  fi
+  # suffix match on path (e.g. "HUB-2220" matches the directory ending in HUB-2220-...)
+  awk -F'\t' -v needle="$target" 'index($4, needle){print $4}' <<<"$rows"
+}
+
+cmd_stop() {
+  if [ "${1:-}" = "--all" ]; then
+    local paths
+    paths="$(discover | awk -F'\t' '{print $4}')"
+    if [ -z "$paths" ]; then
+      echo "Nothing to stop."
+      return 0
+    fi
+    while IFS= read -r p; do
+      remove_one "$p" || true
+    done <<<"$paths"
+    return 0
+  fi
+  if [ -z "${1:-}" ]; then
+    echo "usage: factory-worktrees stop <name|index> | --all" >&2
+    exit 2
+  fi
+  local matches
+  matches="$(resolve_target "$1")"
+  local count
+  count="$(printf '%s\n' "$matches" | sed '/^$/d' | wc -l | tr -d ' ')"
+  if [ "$count" = "0" ]; then
+    echo "✖ no worktree matched: $1" >&2
+    exit 1
+  fi
+  if [ "$count" -gt 1 ]; then
+    echo "✖ ambiguous match for '$1':" >&2
+    printf '  %s\n' $matches >&2
+    exit 1
+  fi
+  remove_one "$matches"
+}
+
+cmd_prune() {
+  for repo in "$WORKSPACE"/*; do
+    [ -d "$repo/.git" ] || continue
+    if [ "$DRY" = "1" ]; then
+      echo "DRY: git -C $repo worktree prune"
+    else
+      git -C "$repo" worktree prune -v || true
+    fi
+  done
+}
+
+case "$SUB" in
+  list|"") cmd_list ;;
+  stop)    cmd_stop "$@" ;;
+  prune)   cmd_prune ;;
+  -h|--help|help)
+    sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+    ;;
+  *)
+    echo "unknown subcommand: $SUB" >&2
+    echo "try: factory-worktrees [list|stop <id>|stop --all|prune]" >&2
+    exit 2
+    ;;
+esac

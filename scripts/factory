@@ -108,7 +108,8 @@ run_once() {
     echo "✖ factory: $AGENT exited non-zero; see $LOG" >&2
     exit 1
   fi
-  RESULT="$(grep -E '^FACTORY_(RESULT|BLOCKED)' "$LOG" | tail -1 || true)"
+  # Match the result line even when wrapped in backticks / markdown / leading whitespace.
+  RESULT="$(grep -oE 'FACTORY_(RESULT|BLOCKED)[^`]*' "$LOG" | tail -1 | sed -E 's/[[:space:]]+$//' || true)"
 }
 
 run_once

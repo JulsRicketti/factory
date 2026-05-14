@@ -48,10 +48,11 @@ Derive from the ticket summary + acceptance criteria. Don't paraphrase — be sp
    - `## Test plan` — what CI will verify
    - Screenshots/recordings section (leave `_TODO: add screenshot_` placeholder if UI — do not block on this)
 9. **LINK JIRA** — comment the PR URL on the ticket, transition to _In Review_.
-10. **HAND OFF** — print, on its own line at the very end:
-    ```
+10. **HAND OFF** — print the result line as the **last line of your output**, raw text, no backticks, no code fence, no leading characters. Exactly this format:
+
     FACTORY_RESULT pr=<url> branch=<name> repo=<owner/name> ticket=<key>
-    ```
+
+    The wrapper greps for this — wrapping it in markdown (`` `FACTORY_RESULT ...` ``) will break parsing.
 
 ## Self-unblocking
 
