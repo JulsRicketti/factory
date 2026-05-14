@@ -99,7 +99,7 @@ remove_one() {
     return 0
   fi
   echo "▶ removing $path  (repo: $(basename "$repo"))"
-  git -C "$repo" worktree remove "${flags[@]}" "$path" || {
+  git -C "$repo" worktree remove ${flags[@]+"${flags[@]}"} "$path" || {
     echo "  (retrying with --force)"
     git -C "$repo" worktree remove --force "$path"
   }

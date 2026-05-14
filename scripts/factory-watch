@@ -70,7 +70,7 @@ if [[ "$AUTO_FIX" == "1" ]]; then
   [[ "$FIX_ON_START" == "1" ]] && EXTRA+=(--fix-on-start)
   exec "$FACTORY_ROOT/scripts/watch-pr.sh" "$REPO" "$PR" --on-change \
     "cd '$FACTORY_ROOT' && copilot --add-dir '$HOME/Workspace' --allow-all-tools --no-color -p \"$FIX_PROMPT\"" \
-    "${EXTRA[@]}"
+    ${EXTRA[@]+"${EXTRA[@]}"}
 else
   exec "$FACTORY_ROOT/scripts/watch-pr.sh" "$REPO" "$PR"
 fi
