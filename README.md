@@ -131,9 +131,33 @@ factory-watch qlik-trial/hub-parcels#4521
 cd ~/Workspace/hub-parcels && factory-watch 4521
 ```
 
+Pin the target repo (skips the repo-inference ladder):
+
+```bash
+factory HUB-12345 --repo hub
+```
+
+…or put `factory-repo: hub` anywhere in the Jira ticket. CLI flag wins.
+
+Route the implementation through one or more target-repo agents (e.g. files under `<target-repo>/.github/agents/`):
+
+```bash
+factory HUB-12345 --repo-agent mui-migration-to-sprout
+factory HUB-12345 --repo-agent mui-migration-to-sprout,datatable-to-sprout-table   # comma-separated
+factory HUB-12345 --repo-agent mui-migration-to-sprout --repo-agent flag-offbaarder # repeated flag
+```
+
+…or put `factory-repo-agent: mui-migration-to-sprout, datatable-to-sprout-table` anywhere in the Jira ticket description/comments.
+
+**The CLI list and the ticket directive are unioned** — neither replaces the other. If you pass `--repo-agent A` and the ticket says `factory-repo-agent: B`, both A and B run.
+
+When multiple agents are active, each MUI/DataTable/etc. occurrence is routed to the agent whose domain matches. Conflicts on the same occurrence fall back to the earlier-listed agent and are recorded in the PR's `## Assumptions` section. The full active list is always recorded in the PR body under `## Agents used`.
+
 Environment overrides:
 
 - `FACTORY_MODEL=claude-opus-4.7` — pin a specific model
+- `FACTORY_REPO=hub` — default target repo (overridden by --repo and ticket directive)
+- `FACTORY_REPO_AGENT=mui-migration-to-sprout` — default repo-agent (overridden by --repo-agent and ticket directive)
 - `FACTORY_DRY_RUN=1` — print the `copilot` command without running
 - `FACTORY_WATCH_INTERVAL=30` — seconds between PR polls
 

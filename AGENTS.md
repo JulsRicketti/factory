@@ -36,7 +36,9 @@ The factory runs in **9 stages**. Stages 1–6 produce a draft PR. Stages 7–9 
 
 - `mcp_jira_get_issue` with the ticket key.
 - Pull the ticket description, acceptance criteria, linked issues, and all comments. Don't summarise — keep the raw text for later stages.
+- **Check for a target-repo directive**: if the ticket body or comments contain `factory-repo: <name>` (e.g. `factory-repo: hub`), use `~/Workspace/<name>` as the target repo and skip the inference ladder. The CLI flag `--repo <name>` (or env `FACTORY_REPO`) **always overrides** any ticket directive. If the directory does not exist, abort with `FACTORY_BLOCKED: unknown-repo name=<name>`.
 - **Check for an agent directive**: if the ticket body or comments contain `factory-agent: <name>` (e.g. `factory-agent: claude`), and `<name>` differs from `CURRENT_AGENT`, abort with `FACTORY_BLOCKED: wrong-agent expected=<name>` so the wrapper relaunches with the right CLI. Supported names: `copilot`, `claude`, `codex`.
+- **Check for repo-agent directives**: if the ticket body or comments contain one or more `factory-repo-agent: <name>[,<name>...]` lines, load each `<target-repo>/.github/agents/<name>.agent.md` during UNDERSTAND and follow their contracts throughout IMPLEMENT. Multiple agents can be active in the same run — each occurrence is routed to the agent whose domain it falls under. The CLI flag `--repo-agent <name>` (repeatable, or comma-separated) and env `FACTORY_REPO_AGENT` are **unioned with** the ticket directive — neither replaces the other; both contribute. The resolved list (deduplicated, CLI entries first) MUST be recorded in the PR body under `## Agents used`. If any named file does not exist in the target repo, abort with `FACTORY_BLOCKED: missing-repo-agent name=<name>`.
 - If the target repo is ambiguous, **ask the user**.
 
 ### 2. UNDERSTAND
