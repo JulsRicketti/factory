@@ -107,6 +107,8 @@ Or use the helper: `~/Workspace/factory/scripts/new-worktree.sh <target-repo> <T
 
 ## Learning — the config IS the memory
 
+> 🔒 **Lessons live on their own branch.** Never commit `.factory/lessons.md` (or any `/memories/*.md`) edits onto the active feature/fix branch — those diffs leak into unrelated PRs and confuse reviewers. Always create a dedicated `factory/lessons-<date>-<slug>` branch off the default branch and open a separate draft PR labelled `agentic-loop`. See [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) for the exact procedure.
+
 Every PR teaches the factory something. After each fix cycle, classify and persist:
 
 - **Repo-specific corrections** → `~/Workspace/<target-repo>/.factory/lessons.md` (committed to the repo so teammates benefit) OR `/memories/repo/<target-repo>.md` (local Copilot memory).
