@@ -107,7 +107,15 @@ Or use the helper: `~/Workspace/factory/scripts/new-worktree.sh <target-repo> <T
 
 ## Learning — the config IS the memory
 
-> 🔒 **Lessons live on their own branch.** Never commit `.factory/lessons.md` (or any `/memories/*.md`) edits onto the active feature/fix branch — those diffs leak into unrelated PRs and confuse reviewers. Always create a dedicated `factory/lessons-<date>-<slug>` branch off the default branch and open a separate draft PR labelled `agentic-loop`. See [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) for the exact procedure.
+> 🔒 **Hard rules — no exceptions:**
+> 1. **NEVER open a standalone PR for lesson updates.** No `factory/lessons-*` branches, no `chore(factory): lessons update` PRs.
+> 2. **Lessons come EXCLUSIVELY from review feedback on PRs the agent itself opened.** Never derive lessons from the task itself, your own implementation choices, CI failures, or anything outside a human reviewer's comment.
+> 3. **Only general-purpose, transferable rules qualify** — things that apply to *any future PR in this repo*. Example: "Never sign a locale string." Anything tied to a specific file, ticket, component, or feature is **not** a lesson and must be discarded.
+> 4. **Most comments are not lessons.** When in doubt, discard. A weak lesson is worse than no lesson.
+>
+> Qualifying lesson updates are committed as part of the **same fix commit** that addresses the review feedback, on the active PR's branch. No separate commit, no separate PR.
+>
+> See [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) for the exact filter.
 
 Every PR teaches the factory something. After each fix cycle, classify and persist:
 

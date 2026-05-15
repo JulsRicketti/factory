@@ -9,26 +9,31 @@ Inputs:
 
 - PR number + repo, OR a pasted batch of review comments.
 
-## 🔒 Branch isolation — read first
+## 🔒 Hard rules — read first
 
-**Never commit lesson updates onto the active feature/fix branch.** Lessons leak across unrelated PRs when this happens and pollute the diff. Strictly enforce:
+These are non-negotiable. Violations break the user's workflow.
 
-1. Stash or set aside any uncommitted lesson edits before switching context.
-2. From the target repo, check out a **fresh branch off the default branch** (not off the current feature branch) named `factory/lessons-<YYYYMMDD>-<short-slug>` (e.g. `factory/lessons-20260515-mui-classnames`). If a matching factory/lessons branch already exists and is unmerged, reuse it.
-3. Apply the lesson edits only on that branch.
-4. Commit with a Conventional Commit message like `chore(factory): record lesson on <topic>` — no Jira scope.
-5. Push and open a **separate draft PR** for the lesson update. Title: `chore(factory): lessons update <short-slug>`. Body explains which PR/comment the lesson came from. Label it `agentic-loop`.
-6. Switch back to the original branch you were working on so subsequent fix-cycle work continues unaffected.
+1. **NEVER open a standalone PR for lesson updates.** No `factory/lessons-*` branches, no `chore(factory): lessons update` PRs. Lessons piggyback on the active PR's fix commit or they do not get written at all.
+2. **Lessons come EXCLUSIVELY from PR review feedback on the agent's own PR.** Never derive lessons from the task itself, from your own implementation choices, from CI failures you caused, or from anything the user did not flag in a review comment.
+3. **Only the agent triggers `learn-from-pr`.** If the user opened the PR, do not run this prompt against it.
+4. **Lessons must be general-purpose, transferable rules.** A lesson is something that would apply to *any future PR in this repo*. Example of a real lesson: "Never sign a locale string." Example of NOT a lesson: "In CreatePageModal, the description field needs a fallback to empty string." Anything tied to a specific file, ticket, component, feature, refactor, or one-time decision is **not** a lesson — discard it.
+5. **Most comments are not lessons.** When in doubt, discard. Recording noise pollutes the repo's `.factory/lessons.md` and erodes trust. Better to skip a borderline comment than to add a weak rule.
 
-If you are unable to create the dedicated branch (e.g. you are not currently in the target repo's worktree), emit `FACTORY_BLOCKED: cannot-isolate-lessons` and exit — do **not** fall back to committing on the active branch.
+If a comment passes all four filters (review-only, agent-authored PR, general-purpose, recurring/principled), include the lesson update as part of the **same commit** that addresses the review feedback on the active branch. No extra commit, no extra PR.
 
 Steps:
 
-1. Collect all review feedback on the PR (use `./scripts/fetch-pr-feedback.sh` if not already run).
-2. For each comment that represents a **correction or preference**, classify:
-   - **Repo-specific convention** → goes into `/memories/repo/<target-repo>.md`
+1. Confirm the PR was opened by the factory agent. If not, exit immediately — do not record lessons against user-authored PRs.
+2. Collect all review feedback on the PR (use `./scripts/fetch-pr-feedback.sh` if not already run). Ignore your own automated replies and CI bot comments.
+3. For each remaining comment, apply the **lesson filter**. A comment qualifies only if it is **all** of:
+   - A correction or stated preference from a human reviewer (not a question, not praise, not "nit").
+   - **General-purpose**: the rule would apply across any future PR in this repo, not just this file/feature/ticket.
+   - **Principled or recurring**: the reviewer is articulating a standard, not a one-off taste call.
+   Borderline? Discard. The bar is "would I be embarrassed if this rule were violated in another PR six months from now?" — if no, it is not a lesson.
+4. For each qualifying comment, classify:
+   - **Repo-specific convention** → goes into `<target-repo>/.factory/lessons.md` (committed) or `/memories/repo/<target-repo>.md`
    - **Cross-repo / personal preference** of the user → goes into `/memories/<topic>.md` (user scope)
-   - **One-off / noise** → discard, do not record
+   - Everything else → discard, do not record
 3. Before writing, `view` existing memory files to avoid duplicates. Update existing entries rather than creating new files when possible.
 4. Write entries as short, concrete rules — not prose. Examples:
    - `- Never use Material UI; use Sprout + classNames()` (repo)
