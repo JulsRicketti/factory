@@ -28,6 +28,11 @@ This file is a _template_ — copy it to `~/Workspace/<target-repo>/.factory/les
 - `<repo>` renamed/deprecated modules — e.g. `SpaceDetails` → `WorkspaceDetailsPanel`.
 - `<repo>` required checks that the PR won't merge without.
 
+## Repo targeting
+
+- Never open PRs in `qcs-ui-common` unless the ticket explicitly names it as the target. All hub-specific component changes (including components that _consume_ shared-library packages) belong in `hub` or `hub-parcels`. A ticket referencing a component name (e.g., PerformanceEvaluation) almost certainly means the consuming app repo, not the shared library.
+- When in doubt about the target repo, ask before opening the PR — closing a wrong-repo PR is high-friction for the reviewer.
+
 ## Jira: Never use curl — use MCP tools
 **Lesson**: Do NOT read credentials from `~/Library/Application Support/Code/User/mcp.json` or any credential file to build curl/node HTTP requests to Jira. This prints API tokens in plaintext in terminal history and chat logs.
 **Rule**: Always use `mcp_jira_*` MCP tools (e.g. `mcp_jira_get_issue`, `mcp_jira_add_comment`, `mcp_jira_transition_issue`) for all Jira operations. These tools handle auth internally with no credential exposure.
