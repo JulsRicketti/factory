@@ -15,6 +15,7 @@ This file is a _template_ — copy it to `~/Workspace/<target-repo>/.factory/les
 
 ## Process hygiene
 
+- When writing a lesson from a review comment, scope it precisely. If the reviewer objected to the agent *introducing* a new pattern, write "Do NOT introduce new X" — not "Do NOT do X". A blanket "never do X" lesson will cause future agents to alter existing code unnecessarily.
 - Compute a blocker fingerprint = hash(unresolved-comment-ids + check-conclusions + mergeable-state). Only dispatch a fix when it changes.
 - Check "branch behind base" — a yellow PR won't go green until you rebase/merge.
 - Macos `sed` needs `sed -E` for extended regex; pipe delimiters break without `-E`.
