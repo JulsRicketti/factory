@@ -1,7 +1,7 @@
 # Factory lessons (seed)
 
 Short, imperative, transferable rules. Never secrets, names, or PR-specific details.
-This file is a _template_ — copy it to `~/Workspace/<target-repo>/.factory/lessons.md`
+This file is a _template_ — copy it to `~/Workspace/<target-repo>/.factory/config.md`
 (committed) or mirror the rules into `/memories/repo/<target-repo>.md` (Copilot memory).
 
 ## Universal (apply to any repo)

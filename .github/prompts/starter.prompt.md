@@ -22,7 +22,7 @@ Pull the ticket via `mcp_jira_get_issue`. Keep the full description, acceptance 
 
 ### 2. UNDERSTAND
 
-Read the target repo's `AGENTS.md`, `.github/instructions/`, `.github/skills/`, and `.factory/lessons.md` if it exists. Read `.github/workflows/*` — you need to know which checks must pass. Open one sample source + matching test file to learn conventions.
+Read the target repo's `AGENTS.md`, `.github/instructions/`, `.github/skills/`, and `.factory/config.md` if it exists. Read `.github/workflows/*` — you need to know which checks must pass. Open one sample source + matching test file to learn conventions.
 
 ### 3. PLAN
 
@@ -64,7 +64,7 @@ It computes a blocker fingerprint. When it changes, move to stage 9.
 
 ### 9. FIX + LEARN
 
-When WATCH detects a blocker, collect **everything** (raw review comments, full CI failure logs, full diff, latest base). Run the [respond-to-pr-review](respond-to-pr-review.prompt.md) prompt: decide the fix, push, reply per thread. Then run [learn-from-pr](learn-from-pr.prompt.md) to capture any transferable lesson into `/memories/repo/<target-repo>.md` or the repo's `.factory/lessons.md`.
+When WATCH detects a blocker, collect **everything** (raw review comments, full CI failure logs, full diff, latest base). Run the [respond-to-pr-review](respond-to-pr-review.prompt.md) prompt: decide the fix, push, reply per thread. Then run [learn-from-pr](learn-from-pr.prompt.md) to capture any transferable lesson into `/memories/repo/<target-repo>.md` or the repo's `.factory/config.md`.
 
 If the fingerprint keeps oscillating or you're looping on the same blocker, **exit non-zero** and tell me.
 

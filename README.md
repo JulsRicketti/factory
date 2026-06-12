@@ -13,7 +13,7 @@ This repo does **not** contain product code. It contains:
 - Reusable prompts (`.github/prompts/`) — starter, triage, PR open, review response, learning
 - A VS Code chat mode (`.github/chatmodes/Factory.chatmode.md`)
 - Helper scripts (`scripts/`) — worktree, watch loop with blocker fingerprint, PR feedback dump
-- Learned lessons seed (`.factory/lessons.md`)
+- Learned lessons seed (`.factory/config.md`)
 
 ## Target repos
 
@@ -273,11 +273,11 @@ TICKET = HUB-12345"
 
 Every PR teaches the factory. After each fix cycle, lessons are classified:
 
-- **Repo-specific rules** → `~/Workspace/<repo>/.factory/lessons.md` (committed, shared with team) or `/memories/repo/<repo>.md` (local Copilot memory)
+- **Repo-specific rules** → `~/Workspace/<repo>/.factory/config.md` (committed, shared with team) or `/memories/repo/<repo>.md` (local Copilot memory)
 - **User-wide preferences** → `/memories/<topic>.md` (auto-loaded into every conversation)
 - **One-offs** → discarded
 
-See [.factory/lessons.md](.factory/lessons.md) for the seed template and [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) for the classification rules.
+See [.factory/config.md](.factory/config.md) for the seed template and [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) for the classification rules.
 
 ## Mindset
 

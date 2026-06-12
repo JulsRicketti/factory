@@ -17,7 +17,7 @@ These are non-negotiable. Violations break the user's workflow.
 2. **Lessons come EXCLUSIVELY from PR review feedback on the agent's own PR.** Never derive lessons from the task itself, from your own implementation choices, from CI failures you caused, or from anything the user did not flag in a review comment.
 3. **Only the agent triggers `learn-from-pr`.** If the user opened the PR, do not run this prompt against it.
 4. **Lessons must be general-purpose, transferable rules.** A lesson is something that would apply to *any future PR in this repo*. Example of a real lesson: "Never sign a locale string." Example of NOT a lesson: "In CreatePageModal, the description field needs a fallback to empty string." Anything tied to a specific file, ticket, component, feature, refactor, or one-time decision is **not** a lesson — discard it.
-5. **Most comments are not lessons.** When in doubt, discard. Recording noise pollutes the repo's `.factory/lessons.md` and erodes trust. Better to skip a borderline comment than to add a weak rule.
+5. **Most comments are not lessons.** When in doubt, discard. Recording noise pollutes the repo's `.factory/config.md` and erodes trust. Better to skip a borderline comment than to add a weak rule.
 
 If a comment passes all four filters (review-only, agent-authored PR, general-purpose, recurring/principled), include the lesson update as part of the **same commit** that addresses the review feedback on the active branch. No extra commit, no extra PR.
 
@@ -31,7 +31,7 @@ Steps:
    - **Principled or recurring**: the reviewer is articulating a standard, not a one-off taste call.
    Borderline? Discard. The bar is "would I be embarrassed if this rule were violated in another PR six months from now?" — if no, it is not a lesson.
 4. For each qualifying comment, classify:
-   - **Repo-specific convention** → goes into `<target-repo>/.factory/lessons.md` (committed) or `/memories/repo/<target-repo>.md`
+   - **Repo-specific convention** → goes into `<target-repo>/.factory/config.md` (committed) or `/memories/repo/<target-repo>.md`
    - **Cross-repo / personal preference** of the user → goes into `/memories/<topic>.md` (user scope)
    - Everything else → discard, do not record
 3. Before writing, `view` existing memory files to avoid duplicates. Update existing entries rather than creating new files when possible.

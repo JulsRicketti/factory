@@ -121,11 +121,11 @@ Or use the helper: `~/Workspace/factory/scripts/new-worktree.sh <target-repo> <T
 
 Every PR teaches the factory something. After each fix cycle, classify and persist:
 
-- **Repo-specific corrections** → `~/Workspace/<target-repo>/.factory/lessons.md` (committed to the repo so teammates benefit) OR `/memories/repo/<target-repo>.md` (local Copilot memory).
+- **Repo-specific corrections** → `~/Workspace/<target-repo>/.factory/config.md` (committed to the repo so teammates benefit) OR `/memories/repo/<target-repo>.md` (local Copilot memory).
 - **User preferences that span repos** → `/memories/<topic>.md` (user-scope, auto-loaded into every conversation).
 - **One-offs / noise** → discard.
 
-Write short, imperative bullets. Check existing files first to avoid duplicates. Never record secrets, author names, or PR-specific details. See [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) and [.factory/lessons.md](.factory/lessons.md) for the seed template.
+Write short, imperative bullets. Check existing files first to avoid duplicates. Never record secrets, author names, or PR-specific details. See [learn-from-pr](.github/prompts/learn-from-pr.prompt.md) and [.factory/config.md](.factory/config.md) for the seed template.
 
 ## Anti-patterns
 
