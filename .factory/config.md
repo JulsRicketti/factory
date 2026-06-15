@@ -17,6 +17,8 @@ This file is a _template_ — copy it to `~/Workspace/<target-repo>/.factory/con
 
 - When writing a lesson from a review comment, scope it precisely. If the reviewer objected to the agent *introducing* a new pattern, write "Do NOT introduce new X" — not "Do NOT do X". A blanket "never do X" lesson will cause future agents to alter existing code unnecessarily.
 - Most reviewer comments are NOT lessons. A comment is only lesson-worthy if it is general, transferable, and applies to any future PR. UI-specific choices (e.g. exact padding values for a particular component) are PR-specific and must be discarded. When in doubt, discard.
+- Always write repo lessons to `<target-repo>/.factory/config.md` — NOT `lessons.md`. The canonical file is `config.md`; writing to `lessons.md` creates an orphaned file that is never loaded and the lesson is lost.
+- Each lesson commit on a PR branch must only contain lessons derived from review feedback on that specific PR. Never include lessons from other PRs or from previous sessions.
 - Compute a blocker fingerprint = hash(unresolved-comment-ids + check-conclusions + mergeable-state). Only dispatch a fix when it changes.
 - Check "branch behind base" — a yellow PR won't go green until you rebase/merge.
 - Macos `sed` needs `sed -E` for extended regex; pipe delimiters break without `-E`.
