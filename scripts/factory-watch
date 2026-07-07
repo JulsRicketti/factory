@@ -24,7 +24,7 @@ if [[ $# -lt 1 ]]; then
 fi
 
 AUTO_FIX=1
-FIX_ON_START=0
+FIX_ON_START=1
 ARGS=()
 for a in "$@"; do
   case "$a" in
