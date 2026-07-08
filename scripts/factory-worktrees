@@ -9,8 +9,11 @@
 #   factory-worktrees                       # list all factory worktrees (default)
 #   factory-worktrees list                  # same as above
 #   factory-worktrees stop <name|index>     # remove one worktree by path-suffix or list index
-#   factory-worktrees stop --all            # remove all factory worktrees
+#   factory-worktrees stop --all            # remove all factory worktrees AND stop all factory-watch loops
 #   factory-worktrees prune                 # `git worktree prune` every repo (cleans stale entries)
+#
+# Note: `stop --all` also stops every running `factory-watch`/`watch-pr.sh` loop
+# (and the `copilot` runs they spawned), so no background factory keeps editing.
 #
 # Flags:
 #   --force   pass --force to `git worktree remove` (drop uncommitted changes)
@@ -124,17 +127,69 @@ resolve_target() {
   awk -F'\t' -v needle="$target" 'index($4, needle){print $4}' <<<"$rows"
 }
 
+# factory-watch runs an indefinite `watch-pr.sh` poll loop that spawns `copilot`
+# on every PR change. Removing worktrees does not touch those processes, so a
+# full stop has to hunt them down too. Match on the script path so we don't hit
+# unrelated `copilot` sessions the user started by hand.
+WATCH_MATCH="scripts/watch-pr.sh"
+
+# Echo every PID in the subtree rooted at $1, deepest first, so callers can kill
+# leaf-to-root (copilot before the watch loop that's blocked waiting on it).
+watch_descendants() {
+  local pid="$1" child
+  while IFS= read -r child; do
+    [ -n "$child" ] && watch_descendants "$child"
+  done < <(pgrep -P "$pid" 2>/dev/null || true)
+  echo "$pid"
+}
+
+stop_watches() {
+  local roots
+  roots="$(pgrep -f "$WATCH_MATCH" 2>/dev/null || true)"
+  if [ -z "$roots" ]; then
+    echo "No factory watches running."
+    return 0
+  fi
+
+  local pids=() root p
+  for root in $roots; do
+    [ "$root" = "$$" ] && continue   # never target this script
+    while IFS= read -r p; do
+      [ -n "$p" ] && pids+=("$p")
+    done < <(watch_descendants "$root")
+  done
+
+  if [ "${#pids[@]}" -eq 0 ]; then
+    echo "No factory watches running."
+    return 0
+  fi
+
+  if [ "$DRY" = "1" ]; then
+    echo "DRY: would stop factory watch process(es): ${pids[*]}"
+    return 0
+  fi
+
+  echo "▶ stopping factory watch(es) and their copilot runs: ${pids[*]}"
+  for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done
+  sleep 1
+  for p in "${pids[@]}"; do
+    kill -0 "$p" 2>/dev/null && kill -9 "$p" 2>/dev/null || true
+  done
+}
+
 cmd_stop() {
   if [ "${1:-}" = "--all" ]; then
     local paths
     paths="$(discover | awk -F'\t' '{print $4}')"
     if [ -z "$paths" ]; then
-      echo "Nothing to stop."
-      return 0
+      echo "No factory worktrees to remove."
+    else
+      while IFS= read -r p; do
+        remove_one "$p" || true
+      done <<<"$paths"
     fi
-    while IFS= read -r p; do
-      remove_one "$p" || true
-    done <<<"$paths"
+    # Always stop watches too, even when there were no worktrees to remove.
+    stop_watches
     return 0
   fi
   if [ -z "${1:-}" ]; then
