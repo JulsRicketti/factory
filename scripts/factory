@@ -109,7 +109,8 @@ PROMPT_FILE="$FACTORY_ROOT/.github/prompts/autopilot.prompt.md"
 [[ -f "$PROMPT_FILE" ]] || { echo "missing prompt: $PROMPT_FILE" >&2; exit 1; }
 
 # Build the one-shot prompt: full autopilot contract + the ticket key + current agent.
-FULL_PROMPT="$(cat "$PROMPT_FILE")
+# Strip YAML frontmatter: a prompt starting with `---` is parsed as a flag by the agent CLI.
+FULL_PROMPT="$(awk 'NR==1 && /^---$/ {fm=1; next} fm && /^---$/ {fm=0; next} !fm' "$PROMPT_FILE")
 
 ---
 

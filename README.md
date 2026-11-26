@@ -205,6 +205,9 @@ The two you'll use daily:
 | Ticket → draft PR + autopilot watch | `factory <TICKET> --watch`                 |
 | Attach autopilot to an existing PR  | `factory-watch <pr-url \| owner/repo#num>` |
 | Watch an existing PR (no auto-fix)  | `factory-watch <pr-ref> --no-auto-fix`     |
+| List running watchers               | `factory-watch list`                       |
+| Stop watching a PR                  | `factory-watch stop <pr-ref>`              |
+| Stop every watcher                  | `factory-watch stop --all`                 |
 | List all factory worktrees          | `factory-worktrees`                        |
 | Stop one factory worktree           | `factory-worktrees stop <id\|name>`        |
 | Stop every factory worktree         | `factory-worktrees stop --all`             |

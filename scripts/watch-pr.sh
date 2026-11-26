@@ -88,6 +88,11 @@ print_state() {
 trap 'echo; echo "watch stopped."; exit 0' INT TERM
 
 while true; do
+  PR_STATE=$(gh pr view "$PR" --repo "$REPO" --json state --jq .state 2>/dev/null || echo "")
+  if [ "$PR_STATE" = "MERGED" ] || [ "$PR_STATE" = "CLOSED" ]; then
+    echo "PR $REPO#$PR is $PR_STATE — watch stopped."
+    exit 0
+  fi
   FP=$(fingerprint || echo "")
   if [ "$FP" != "$LAST_FP" ]; then
     clear

@@ -5,6 +5,9 @@
 #   factory-watch <pr>                    # watch + auto-fix (default)
 #   factory-watch <pr> --no-auto-fix      # watch only, just print state changes
 #   factory-watch <pr> --fix-on-start     # also fix pending feedback at startup
+#   factory-watch list                    # list running watchers
+#   factory-watch stop <pr>               # stop the watcher (and any running fix agent) for a PR
+#   factory-watch stop --all              # stop every watcher
 #
 # <pr> accepts any of:
 #   https://github.com/qlik-trial/hub-parcels/pull/4521
@@ -20,8 +23,64 @@ FACTORY_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 if [[ $# -lt 1 ]]; then
   echo "usage: factory-watch <pr-url | owner/repo#num | owner/repo num | num> [--no-auto-fix]" >&2
+  echo "       factory-watch list | stop <pr-ref | --all>" >&2
   exit 2
 fi
+
+# Prints "<pid> <owner/repo> <pr>" for each running watch-pr.sh loop.
+list_watchers() {
+  ps -eo pid=,command= | awk -v me="$$" '
+    $1 != me {
+      for (i = 2; i <= NF; i++) if ($i ~ /\/watch-pr\.sh$/) { print $1, $(i+1), $(i+2); break }
+    }'
+}
+
+kill_tree() {
+  local child
+  for child in $(pgrep -P "$1" 2>/dev/null || true); do kill_tree "$child"; done
+  kill "$1" 2>/dev/null || true
+}
+
+parse_pr_ref() {
+  REPO=""; PR=""
+  case "$1" in
+    https://github.com/*/pull/*)
+      local path="${1#https://github.com/}"
+      REPO="${path%/pull/*}"
+      PR="${path##*/pull/}"; PR="${PR%%[/?#]*}"
+      ;;
+    */*#*)
+      REPO="${1%#*}"; PR="${1#*#}" ;;
+    */*)
+      REPO="$1"; PR="${2:-}" ;;
+    *)
+      PR="$1" ;;
+  esac
+}
+
+case "$1" in
+  list)
+    WATCHERS="$(list_watchers)"
+    if [[ -z "$WATCHERS" ]]; then echo "no watchers running"; else echo "$WATCHERS"; fi
+    exit 0
+    ;;
+  stop)
+    shift
+    [[ $# -ge 1 ]] || { echo "usage: factory-watch stop <pr-ref | --all>" >&2; exit 2; }
+    if [[ "$1" != "--all" ]]; then parse_pr_ref "$@"; fi
+    STOPPED=0
+    while read -r pid repo pr; do
+      [[ -n "$pid" ]] || continue
+      if [[ "$1" == "--all" ]] || { [[ "$pr" == "$PR" ]] && [[ -z "$REPO" || "$repo" == "$REPO" ]]; }; then
+        kill_tree "$pid"
+        echo "stopped watcher for $repo#$pr (pid $pid)"
+        STOPPED=$((STOPPED + 1))
+      fi
+    done <<<"$(list_watchers)"
+    [[ "$STOPPED" -gt 0 ]] || { echo "no matching watcher running" >&2; exit 1; }
+    exit 0
+    ;;
+esac
 
 AUTO_FIX=1
 FIX_ON_START=1
@@ -35,23 +94,11 @@ for a in "$@"; do
 done
 set -- "${ARGS[@]}"
 
-REPO=""; PR=""
-case "$1" in
-  https://github.com/*/pull/*)
-    path="${1#https://github.com/}"
-    REPO="${path%/pull/*}"
-    PR="${path##*/pull/}"; PR="${PR%%[/?#]*}"
-    ;;
-  */*#*)
-    REPO="${1%#*}"; PR="${1#*#}" ;;
-  */*)
-    REPO="$1"; PR="${2:-}" ;;
-  *)
-    # bare number — infer repo from current git remote
-    PR="$1"
-    REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
-    ;;
-esac
+parse_pr_ref "$@"
+if [[ -z "$REPO" ]]; then
+  # bare number — infer repo from current git remote
+  REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
+fi
 
 if [[ -z "$REPO" || -z "$PR" ]]; then
   echo "could not parse PR reference: $*" >&2

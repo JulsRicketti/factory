@@ -40,3 +40,9 @@ This file is a _template_ — copy it to `~/Workspace/<target-repo>/.factory/con
 ## Jira: Never use curl — use MCP tools
 **Lesson**: Do NOT read credentials from `~/Library/Application Support/Code/User/mcp.json` or any credential file to build curl/node HTTP requests to Jira. This prints API tokens in plaintext in terminal history and chat logs.
 **Rule**: Always use `mcp_jira_*` MCP tools (e.g. `mcp_jira_get_issue`, `mcp_jira_add_comment`, `mcp_jira_transition_issue`) for all Jira operations. These tools handle auth internally with no credential exposure.
+
+## PR descriptions
+- Fill in the target repo's PR template instead of a custom body; keep it short and to the point, assuming the reviewer already has the product open (no how-to-run steps).
+
+## Locale strings
+- Never add reviewer signatures or timestamps to locale string entries; only `value` and `comment`. Signing is exclusively for string reviewers.
