@@ -15,11 +15,7 @@ Steps:
 4. `mcp_jira_get_issue` to fetch ticket title + description for the PR body.
 5. Open the PR via the GitHub MCP as a **draft** with:
    - Title: Conventional Commits with the Jira ticket as the scope, e.g. `fix(HUB-12345): short summary` (or `feat(...)`, `chore(...)`, `refactor(...)`, etc.).
-   - Body:
-     - Jira link
-     - Summary
-     - Test plan
-     - Checklist (lint, tests, translations if applicable)
+   - Body: the repo's PR template (`.github/pull_request_template.md` or `.github/PULL_REQUEST_TEMPLATE*`), copied verbatim and filled in, with headings, order and checkbox wording unchanged; put the Jira link in its description section. Only if the repo has no template, use: Jira link, summary, test plan, checklist (lint, tests, translations if applicable).
 6. Add the `agentic-loop` label to the PR via the GitHub MCP (e.g., using the add issue/PR labels tool).
 7. Immediately after opening the PR, post a `#devbuild-test` comment on it to trigger the dev build pipeline.
 8. Comment on the Jira ticket with the PR URL.

@@ -151,7 +151,7 @@ factory HUB-12345 --repo-agent mui-migration-to-sprout --repo-agent flag-offbaar
 
 **The CLI list and the ticket directive are unioned** — neither replaces the other. If you pass `--repo-agent A` and the ticket says `factory-repo-agent: B`, both A and B run.
 
-When multiple agents are active, each MUI/DataTable/etc. occurrence is routed to the agent whose domain matches. Conflicts on the same occurrence fall back to the earlier-listed agent and are recorded in the PR's `## Assumptions` section. The full active list is always recorded in the PR body under `## Agents used`.
+When multiple agents are active, each MUI/DataTable/etc. occurrence is routed to the agent whose domain matches. Conflicts on the same occurrence fall back to the earlier-listed agent and are recorded under **Assumptions** in the PR's `Factory notes` block. The full active list is always recorded there under **Agents used**. The rest of the PR body follows the target repo's PR template.
 
 Environment overrides:
 
