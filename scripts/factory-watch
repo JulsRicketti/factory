@@ -28,11 +28,13 @@ if [[ $# -lt 1 ]]; then
 fi
 
 # Prints "<pid> <owner/repo> <pr>" for each running watch-pr.sh loop.
+# Skips the short-lived subshells a watcher forks while polling (same command line, parent is a watcher).
 list_watchers() {
-  ps -eo pid=,command= | awk -v me="$$" '
+  ps -eo pid=,ppid=,command= | awk -v me="$$" '
     $1 != me {
-      for (i = 2; i <= NF; i++) if ($i ~ /\/watch-pr\.sh$/) { print $1, $(i+1), $(i+2); break }
-    }'
+      for (i = 3; i <= NF; i++) if ($i ~ /\/watch-pr\.sh$/) { w[$1] = $(i+1) " " $(i+2); parent[$1] = $2; break }
+    }
+    END { for (p in w) if (!(parent[p] in w)) print p, w[p] }'
 }
 
 kill_tree() {
